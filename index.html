@@ -3,42 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess P2P Mobile Fix</title>
+    <title>Chess P2P Mobile</title>
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
+        :root { --board-size: min(95vw, 400px); --sq-size: calc(var(--board-size) / 8); }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #1a2e3f; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .game-container { width: 100%; max-width: 450px; padding: 10px; }
-        .status-header { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 5px; }
-        #status { flex: 1; background: #2c3e50; padding: 10px; border-radius: 8px; text-align: center; font-size: 0.8rem; font-weight: bold; border: 1px solid #34495e; }
-        #timer { width: 70px; background: #e67e22; padding: 10px; border-radius: 8px; text-align: center; font-weight: 900; }
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; aspect-ratio: 1/1; border: 3px solid #34495e; background: #34495e; }
-        .square { display: flex; justify-content: center; align-items: center; font-size: 11vw; background-color: #f0d9b5; position: relative; }
+        body { background-color: #1a2e3f; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-top: 10px; }
+        
+        /* Layout Structure */
+        .game-container { width: var(--board-size); display: flex; flex-direction: column; gap: 10px; }
+        .ui-row { display: flex; justify-content: space-between; gap: 5px; height: 45px; }
+        #status { flex: 1; background: #2c3e50; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 1px solid #4a5f72; padding: 0 5px; text-transform: uppercase; }
+        #timer { width: 60px; background: #e67e22; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+
+        /* Mess-Free Board */
+        .board { width: var(--board-size); height: var(--board-size); display: grid; grid-template-columns: repeat(8, 1fr); border: 2px solid #34495e; overflow: hidden; border-radius: 4px; }
+        .square { width: var(--sq-size); height: var(--sq-size); display: flex; justify-content: center; align-items: center; background-color: #f0d9b5; position: relative; font-size: calc(var(--sq-size) * 0.8); cursor: pointer; }
         .square.dark { background-color: #b58863; }
         .square.selected { background-color: #fff2b5 !important; }
-        .dot { height: 25%; width: 25%; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; }
-        .dot.capture { width: 80%; height: 80%; border: 4px solid rgba(0,0,0,0.15); background: transparent; }
-        .controls { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-        #copyBtn { background: #27ae60; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 1rem; box-shadow: 0 4px 0 #1e8449; }
-        .chat-box { background: #1e2b38; padding: 8px; border-radius: 10px; border: 1px solid #34495e; }
-        #messages { height: 50px; overflow-y: auto; font-size: 0.7rem; color: #bdc3c7; }
+        
+        /* Visual Move Hints */
+        .dot { width: 12px; height: 12px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; pointer-events: none; }
+        .dot.capture { width: 85%; height: 85%; border: 4px solid rgba(0,0,0,0.1); background: transparent; }
+
+        /* Controls & Chat */
+        #copyBtn { width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 0 #1e8449; margin-top: 5px; }
+        .chat-box { background: #1e2b38; padding: 10px; border-radius: 10px; border: 1px solid #34495e; margin-top: 10px; }
+        #messages { height: 60px; overflow-y: auto; font-size: 12px; color: #bdc3c7; margin-bottom: 5px; border-bottom: 1px solid #2c3e50; }
         #chat-input { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #2c3e50; color: white; font-size: 16px; outline: none; }
+
+        .check-alert { background: #c0392b !important; }
     </style>
 </head>
 <body>
 
 <div class="game-container">
-    <div class="status-header">
-        <div id="status">WAKING SERVER...</div>
+    <div class="ui-row">
+        <div id="status">Connecting...</div>
         <div id="timer">60s</div>
     </div>
+
     <div class="board" id="board"></div>
-    <div class="controls">
-        <button id="copyBtn">📋 COPY INVITE LINK</button>
-        <div class="chat-box">
-            <div id="messages"></div>
-            <input type="text" id="chat-input" placeholder="Chat here...">
-        </div>
+
+    <button id="copyBtn">📋 COPY INVITE LINK</button>
+
+    <div class="chat-box">
+        <div id="messages"></div>
+        <input type="text" id="chat-input" placeholder="Type message...">
     </div>
 </div>
 
@@ -51,7 +62,7 @@
         board = [['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']];
     }
 
-    // --- MOVE LOGIC ---
+    // --- Chess Logic ---
     function canMove(fr, fc, tr, tc, tempBoard = board) {
         const p = tempBoard[fr][fc]; if (!p) return false;
         const target = tempBoard[tr][tc];
@@ -101,64 +112,45 @@
 
     function executeMove(fr, fc, tr, tc) {
         board[tr][tc] = board[fr][fc]; board[fr][fc] = '';
-        currentPlayer = currentPlayer === 'w' ? 'b' : 'w';
+        currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
         timeLeft = 60; render();
     }
 
-    // --- MOBILE CLIPBOARD FALLBACK ---
-    function copyToClipboard(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            return navigator.clipboard.writeText(text);
-        } else {
-            let textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed"; textArea.style.left = "-9999px"; textArea.style.top = "0";
-            document.body.appendChild(textArea); textArea.focus(); textArea.select();
-            return new Promise((res, rej) => {
-                document.execCommand('copy') ? res() : rej();
-                document.body.removeChild(textArea);
-            });
-        }
-    }
-
-    // --- NETWORK ---
+    // --- Network ---
     function initNetwork() {
-        const room = new URLSearchParams(window.location.search).get('room');
+        const urlParams = new URLSearchParams(window.location.search);
+        const room = urlParams.get('room');
         peer = new Peer();
         
         peer.on('open', id => {
-            const copyBtn = document.getElementById('copyBtn');
             if (!room) {
                 myColor = 'w';
-                document.getElementById('status').innerText = "WAITING FOR OPPONENT...";
-                copyBtn.onclick = () => {
-                    // ADDING index.html to prevent 404
-                    const link = window.location.origin + window.location.pathname.replace(/\/$/, "") + "/index.html?room=" + id;
-                    copyToClipboard(link).then(() => {
-                        copyBtn.innerText = "✅ LINK COPIED!";
-                        setTimeout(() => copyBtn.innerText = "📋 COPY INVITE LINK", 2000);
-                    });
+                document.getElementById('status').innerText = "Host: Awaiting Peer";
+                document.getElementById('copyBtn').onclick = () => {
+                    const cleanPath = window.location.origin + window.location.pathname.replace(/\/$/, "");
+                    const link = cleanPath + "/index.html?room=" + id;
+                    const el = document.createElement('textarea');
+                    el.value = link; document.body.appendChild(el); el.select();
+                    document.execCommand('copy'); document.body.removeChild(el);
+                    document.getElementById('copyBtn').innerText = "✅ COPIED!";
                 };
             } else {
                 myColor = 'b';
-                document.getElementById('status').innerText = "CONNECTING...";
+                document.getElementById('status').innerText = "Guest: Connecting...";
                 conn = peer.connect(room);
                 setupConn();
-                copyBtn.style.display = 'none';
             }
         });
-
         peer.on('connection', c => { conn = c; setupConn(); });
     }
 
     function setupConn() {
         conn.on('open', () => {
-            document.getElementById('messages').innerHTML += "<div>System: Connected!</div>";
+            document.getElementById('messages').innerHTML += "<div>System: Match Started</div>";
             document.getElementById('copyBtn').style.display = 'none';
             timerId = setInterval(() => {
                 if(gameOver) return;
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft + 's';
+                timeLeft--; document.getElementById('timer').innerText = timeLeft + 's';
                 if(timeLeft <= 0) { gameOver = true; render(); }
             }, 1000);
             render();
@@ -175,9 +167,13 @@
 
     function render() {
         const bEl = document.getElementById('board'); bEl.innerHTML = '';
-        const statusBox = document.getElementById('status');
-        if (gameOver) { statusBox.innerText = "GAME OVER"; return; }
-        statusBox.innerText = `${currentPlayer === 'w' ? 'WHITE' : 'BLACK'} TURN ${currentPlayer === myColor ? '(YOU)' : ''}`;
+        const king = findKing(currentPlayer);
+        const inCheck = isSquareAttacked(king.r, king.c, currentPlayer === 'w' ? 'b' : 'w');
+        const sBox = document.getElementById('status');
+        
+        sBox.innerText = `${currentPlayer === 'w' ? 'White' : 'Black'}'s Turn`;
+        if (inCheck) sBox.classList.add('check-alert'); else sBox.classList.remove('check-alert');
+        if (gameOver) sBox.innerText = "Game Over";
 
         const rows = myColor === 'b' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
         for (let r of rows) {
@@ -187,16 +183,16 @@
                 const p = board[r][c];
                 if (p) {
                     s.innerText = symbols[p];
-                    s.style.color = p === p.toUpperCase() ? "white" : "black";
+                    s.style.color = (p === p.toUpperCase()) ? "white" : "black";
                 }
                 if (selected && selected.r === r && selected.c === c) s.classList.add('selected');
                 if (selected && canMove(selected.r, selected.c, r, c) && !wouldBeInCheck(selected.r, selected.c, r, c, myColor)) {
                     const h = document.createElement('div'); h.className = p ? "dot capture" : "dot"; s.appendChild(h);
                 }
                 s.onclick = () => {
-                    if (currentPlayer !== myColor || !conn) return;
+                    if (currentPlayer !== myColor || gameOver || !conn) return;
                     if (!selected) {
-                        if (p && (p === p.toUpperCase() ? 'w' : 'b') === myColor) { selected = {r, c}; render(); }
+                        if (p && ((p === p.toUpperCase() ? 'w' : 'b') === myColor)) { selected = {r, c}; render(); }
                     } else {
                         if (canMove(selected.r, selected.c, r, c) && !wouldBeInCheck(selected.r, selected.c, r, c, myColor)) {
                             conn.send({type: 'move', fr: selected.r, fc: selected.c, tr: r, tc: c});
