@@ -3,27 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>♜ Blitz Chess P2P</title>
+    <title>♜ Ultimate P2P Chess</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', sans-serif; }
         body { background-color: #1a2e3f; color: white; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 10px; }
         .game-container { width: min(95vw, 500px); background: #2c3e50; border-radius: 20px; padding: 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); }
         
-        /* Timer & Status Styling */
+        /* UI Header */
         .header-ui { display: flex; gap: 10px; margin-bottom: 10px; }
-        .status-bar { flex: 2; background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; border: 1px solid #4a5f72; }
-        .timer-box { flex: 1; background: #e67e22; color: white; padding: 12px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 1.2rem; min-width: 80px; }
+        .status-bar { flex: 2; background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; border: 1px solid #4a5f72; font-size: 0.9rem; }
+        .timer-box { flex: 1; background: #e67e22; color: white; padding: 12px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 1.1rem; }
         .status-bar.check { background: #c0392b; animation: pulse 1s infinite; }
         
+        /* The Board */
         .board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1/1; border: 4px solid #34495e; background: #34495e; gap: 0; }
         .square { display: flex; justify-content: center; align-items: center; font-size: min(10vw, 45px); cursor: pointer; background-color: #f0d9b5; line-height: 0; position: relative; }
         .square.dark { background-color: #b58863; }
         .square.selected { background-color: #fff2b5 !important; }
-        .dot { height: 14px; width: 14px; background-color: rgba(0, 0, 0, 0.15); border-radius: 50%; position: absolute; pointer-events: none; }
-        .dot.capture { border: 4px solid rgba(0, 0, 0, 0.1); background: transparent; width: 80%; height: 80%; }
         
-        #copyLink { margin-top: 15px; font-size: 0.75rem; color: #e67e22; font-weight: bold; cursor: pointer; text-align: center; display: block; text-decoration: underline; }
+        /* Move Hints */
+        .dot { height: 14px; width: 14px; background-color: rgba(0, 0, 0, 0.2); border-radius: 50%; position: absolute; pointer-events: none; }
+        .dot.capture { border: 4px solid rgba(0, 0, 0, 0.15); background: transparent; width: 80%; height: 80%; }
+
+        /* Chat System */
+        .chat-area { margin-top: 15px; background: #1e2b38; border-radius: 12px; padding: 10px; border: 1px solid #4a5f72; }
+        #messages { height: 60px; overflow-y: auto; font-size: 0.8rem; color: #bdc3c7; margin-bottom: 8px; border-bottom: 1px solid #34495e; padding-bottom: 5px; }
+        #chat-input { width: 100%; padding: 8px; border-radius: 6px; border: none; background: #2c3e50; color: white; outline: none; }
+
+        #copyLink { margin-top: 12px; font-size: 0.75rem; color: #e67e22; font-weight: bold; cursor: pointer; text-align: center; display: block; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
@@ -35,6 +43,10 @@
         <div id="timer" class="timer-box">60s</div>
     </div>
     <div class="board" id="board"></div>
+    <div class="chat-area">
+        <div id="messages">System: Connect with a friend...</div>
+        <input type="text" id="chat-input" placeholder="Type a message & press Enter...">
+    </div>
     <div id="copyLink"></div>
 </div>
 
@@ -53,13 +65,13 @@
         ];
     }
 
-    // --- Chess Logic ---
     function canMove(fr, fc, tr, tc, tempBoard = board) {
         const p = tempBoard[fr][fc]; if (!p) return false;
         const target = tempBoard[tr][tc];
         const color = p === p.toUpperCase() ? 'w' : 'b';
         if (target && (target === target.toUpperCase() ? 'w' : 'b') === color) return false;
         const dr = Math.abs(tr - fr), dc = Math.abs(tc - fc), type = p.toLowerCase();
+        
         if (type === 'p') {
             const dir = color === 'w' ? -1 : 1;
             if (fc === tc && !target) {
@@ -103,27 +115,32 @@
         return isSquareAttacked(king.r, king.c, color === 'w' ? 'b' : 'w', temp);
     }
 
-    // --- Timer Logic ---
+    function hasLegalMoves(color) {
+        for (let fr=0; fr<8; fr++) for (let fc=0; fc<8; fc++) {
+            const p = board[fr][fc];
+            if (p && (p === p.toUpperCase() ? 'w' : 'b') === color) {
+                for (let tr=0; tr<8; tr++) for (let tc=0; tc<8; tc++) {
+                    if (canMove(fr, fc, tr, tc) && !wouldBeInCheck(fr, fc, tr, tc, color)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     function startTimer() {
-        clearInterval(timerId);
-        timeLeft = 60;
-        updateTimerDisplay();
+        clearInterval(timerId); timeLeft = 60;
+        document.getElementById('timer').innerText = timeLeft + 's';
         timerId = setInterval(() => {
             if (gameOver) return clearInterval(timerId);
             timeLeft--;
-            updateTimerDisplay();
+            document.getElementById('timer').innerText = timeLeft + 's';
             if (timeLeft <= 0) {
-                gameOver = true;
-                clearInterval(timerId);
+                gameOver = true; clearInterval(timerId);
                 const winner = currentPlayer === 'w' ? 'BLACK' : 'WHITE';
                 document.getElementById('status').innerText = `TIME OUT! ${winner} WINS`;
                 render();
             }
         }, 1000);
-    }
-
-    function updateTimerDisplay() {
-        document.getElementById('timer').innerText = timeLeft + 's';
     }
 
     function executeMove(fr, fc, tr, tc) {
@@ -134,7 +151,12 @@
         render();
     }
 
-    // --- Network & Render ---
+    function addMsg(txt) {
+        const m = document.getElementById('messages');
+        m.innerHTML += `<div>${txt}</div>`;
+        m.scrollTop = m.scrollHeight;
+    }
+
     function initNetwork() {
         const room = new URLSearchParams(window.location.search).get('room');
         peer = new Peer();
@@ -142,7 +164,7 @@
             if (!room) {
                 myColor = 'w';
                 const link = window.location.origin + window.location.pathname + '?room=' + id;
-                document.getElementById('copyLink').innerText = "🔗 COPY INVITE LINK";
+                document.getElementById('copyLink').innerText = "🔗 CLICK TO COPY INVITE LINK";
                 document.getElementById('copyLink').onclick = () => { navigator.clipboard.writeText(link); alert("Copied!"); };
             } else {
                 myColor = 'b';
@@ -153,18 +175,24 @@
     }
 
     function setupConn() {
-        conn.on('open', () => { startTimer(); render(); });
-        conn.on('data', data => { if(data.type==='move') executeMove(data.fr, data.fc, data.tr, data.tc); });
+        conn.on('open', () => { startTimer(); addMsg("System: Opponent joined."); render(); });
+        conn.on('data', data => {
+            if(data.type==='move') executeMove(data.fr, data.fc, data.tr, data.tc);
+            if(data.type==='chat') addMsg("Opponent: " + data.msg);
+        });
     }
 
     function render() {
         const bEl = document.getElementById('board'); bEl.innerHTML = '';
         const king = findKing(currentPlayer);
         const inCheck = isSquareAttacked(king.r, king.c, currentPlayer === 'w' ? 'b' : 'w');
+        const noMoves = !hasLegalMoves(currentPlayer);
         const sBar = document.getElementById('status');
         sBar.classList.remove('check');
 
-        if (!gameOver) {
+        if (inCheck && noMoves) { sBar.innerText = "CHECKMATE!"; sBar.classList.add('check'); gameOver = true; }
+        else if (noMoves) { sBar.innerText = "STALEMATE"; gameOver = true; }
+        else if (!gameOver) {
             sBar.innerText = `${currentPlayer==='w'?'WHITE':'BLACK'} TURN ${currentPlayer===myColor?'(YOU)':''}`;
             if (inCheck) { sBar.innerText += " - CHECK!"; sBar.classList.add('check'); }
         }
@@ -181,9 +209,14 @@
                     if(p === p.toUpperCase()) s.style.textShadow = "1px 1px 2px black";
                 }
                 if (selected && selected.r === r && selected.c === c) s.classList.add('selected');
+                
+                // Possible Move Dots - Logic for both players
                 if (selected && canMove(selected.r, selected.c, r, c) && !wouldBeInCheck(selected.r, selected.c, r, c, myColor)) {
-                    const hint = document.createElement('div'); hint.className = p ? "dot capture" : "dot"; s.appendChild(hint);
+                    const hint = document.createElement('div'); 
+                    hint.className = p ? "dot capture" : "dot"; 
+                    s.appendChild(hint);
                 }
+
                 s.onclick = () => {
                     if (currentPlayer !== myColor || gameOver || !conn) return;
                     if (!selected) {
@@ -200,6 +233,15 @@
             }
         }
     }
+
+    document.getElementById('chat-input').onkeypress = e => {
+        if (e.key === 'Enter' && conn && e.target.value.trim()) {
+            conn.send({type: 'chat', msg: e.target.value});
+            addMsg("You: " + e.target.value);
+            e.target.value = '';
+        }
+    };
+
     initBoard(); initNetwork(); render();
 })();
 </script>
