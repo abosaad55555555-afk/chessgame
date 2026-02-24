@@ -3,26 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>♜ Fixed Movement Chess</title>
+    <title>♜ Blitz Chess P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', sans-serif; }
         body { background-color: #1a2e3f; color: white; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 10px; }
         .game-container { width: min(95vw, 500px); background: #2c3e50; border-radius: 20px; padding: 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); }
-        .status-bar { background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; margin-bottom: 10px; border: 1px solid #4a5f72; }
+        
+        /* Timer & Status Styling */
+        .header-ui { display: flex; gap: 10px; margin-bottom: 10px; }
+        .status-bar { flex: 2; background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; border: 1px solid #4a5f72; }
+        .timer-box { flex: 1; background: #e67e22; color: white; padding: 12px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 1.2rem; min-width: 80px; }
+        .status-bar.check { background: #c0392b; animation: pulse 1s infinite; }
+        
         .board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1/1; border: 4px solid #34495e; background: #34495e; gap: 0; }
         .square { display: flex; justify-content: center; align-items: center; font-size: min(10vw, 45px); cursor: pointer; background-color: #f0d9b5; line-height: 0; position: relative; }
         .square.dark { background-color: #b58863; }
         .square.selected { background-color: #fff2b5 !important; }
-        .capture-zone { display: flex; justify-content: space-between; padding: 5px 10px; min-height: 40px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 8px; align-items: center; font-size: 1.2rem; }
-        #copyLink { margin-top: 15px; font-size: 0.75rem; color: #e67e22; font-weight: bold; cursor: pointer; text-align: center; display: block; }
+        .dot { height: 14px; width: 14px; background-color: rgba(0, 0, 0, 0.15); border-radius: 50%; position: absolute; pointer-events: none; }
+        .dot.capture { border: 4px solid rgba(0, 0, 0, 0.1); background: transparent; width: 80%; height: 80%; }
+        
+        #copyLink { margin-top: 15px; font-size: 0.75rem; color: #e67e22; font-weight: bold; cursor: pointer; text-align: center; display: block; text-decoration: underline; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
 <body>
 
 <div class="game-container">
-    <div id="status" class="status-bar">CONNECTING...</div>
-    <div class="capture-zone"><div id="white-caps"></div><div id="black-caps"></div></div>
+    <div class="header-ui">
+        <div id="status" class="status-bar">CONNECTING...</div>
+        <div id="timer" class="timer-box">60s</div>
+    </div>
     <div class="board" id="board"></div>
     <div id="copyLink"></div>
 </div>
@@ -31,6 +42,7 @@
 (function() {
     const symbols = {'r':'♜','n':'♞','b':'♝','q':'♛','k':'♚','p':'♟','R':'♜','N':'♞','B':'♝','Q':'♛','K':'♚','P':'♙'};
     let board = [], currentPlayer = 'w', myColor = null, selected = null, peer, conn;
+    let timeLeft = 60, timerId = null, gameOver = false;
 
     function initBoard() {
         board = [
@@ -41,56 +53,88 @@
         ];
     }
 
-    // --- MOVEMENT VALIDATION ---
-    function canMove(fr, fc, tr, tc) {
-        const p = board[fr][fc];
-        const target = board[tr][tc];
-        if (!p) return false;
+    // --- Chess Logic ---
+    function canMove(fr, fc, tr, tc, tempBoard = board) {
+        const p = tempBoard[fr][fc]; if (!p) return false;
+        const target = tempBoard[tr][tc];
         const color = p === p.toUpperCase() ? 'w' : 'b';
-        if (color !== currentPlayer) return false;
         if (target && (target === target.toUpperCase() ? 'w' : 'b') === color) return false;
-        
-        const dr = Math.abs(tr - fr);
-        const dc = Math.abs(tc - fc);
-        const type = p.toLowerCase();
-
+        const dr = Math.abs(tr - fr), dc = Math.abs(tc - fc), type = p.toLowerCase();
         if (type === 'p') {
             const dir = color === 'w' ? -1 : 1;
             if (fc === tc && !target) {
                 if (tr === fr + dir) return true;
-                if (tr === fr + 2*dir && (fr === 1 || fr === 6) && !board[fr+dir][fc]) return true;
+                if (tr === fr + 2*dir && (fr === 1 || fr === 6) && !tempBoard[fr+dir][fc]) return true;
             }
-            if (dr === 1 && dc === 1 && target) return true;
-            return false;
+            if (dr === 1 && dc === 1 && target) return true; return false;
         }
         if (type === 'n') return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
         if (type === 'k') return dr <= 1 && dc <= 1;
-        
-        // Sliding pieces (Rook, Bishop, Queen)
         if (type === 'r' || type === 'q' || type === 'b') {
             if (type === 'r' && fr !== tr && fc !== tc) return false;
             if (type === 'b' && dr !== dc) return false;
             if (type === 'q' && dr !== dc && fr !== tr && fc !== tc) return false;
-            
-            const stepR = tr === fr ? 0 : (tr > fr ? 1 : -1);
-            const stepC = tc === fc ? 0 : (tc > fc ? 1 : -1);
-            let r = fr + stepR, c = fc + stepC;
-            while (r !== tr || c !== tc) {
-                if (board[r][c]) return false;
-                r += stepR; c += stepC;
-            }
+            const sR = tr === fr ? 0 : (tr > fr ? 1 : -1), sC = tc === fc ? 0 : (tc > fc ? 1 : -1);
+            let r = fr + sR, c = fc + sC;
+            while (r !== tr || c !== tc) { if (tempBoard[r][c]) return false; r += sR; c += sC; }
             return true;
         }
         return false;
+    }
+
+    function findKing(color, tempBoard = board) {
+        for (let r=0; r<8; r++) for (let c=0; c<8; c++) 
+            if (tempBoard[r][c] === (color === 'w' ? 'K' : 'k')) return {r, c};
+    }
+
+    function isSquareAttacked(r, c, attackerColor, tempBoard = board) {
+        for (let ir=0; ir<8; ir++) for (let ic=0; ic<8; ic++) {
+            const p = tempBoard[ir][ic];
+            if (p && (p === p.toUpperCase() ? 'w' : 'b') === attackerColor)
+                if (canMove(ir, ic, r, c, tempBoard)) return true;
+        }
+        return false;
+    }
+
+    function wouldBeInCheck(fr, fc, tr, tc, color) {
+        const temp = board.map(row => [...row]);
+        temp[tr][tc] = temp[fr][fc]; temp[fr][fc] = '';
+        const king = findKing(color, temp);
+        return isSquareAttacked(king.r, king.c, color === 'w' ? 'b' : 'w', temp);
+    }
+
+    // --- Timer Logic ---
+    function startTimer() {
+        clearInterval(timerId);
+        timeLeft = 60;
+        updateTimerDisplay();
+        timerId = setInterval(() => {
+            if (gameOver) return clearInterval(timerId);
+            timeLeft--;
+            updateTimerDisplay();
+            if (timeLeft <= 0) {
+                gameOver = true;
+                clearInterval(timerId);
+                const winner = currentPlayer === 'w' ? 'BLACK' : 'WHITE';
+                document.getElementById('status').innerText = `TIME OUT! ${winner} WINS`;
+                render();
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        document.getElementById('timer').innerText = timeLeft + 's';
     }
 
     function executeMove(fr, fc, tr, tc) {
         board[tr][tc] = board[fr][fc];
         board[fr][fc] = '';
         currentPlayer = (currentPlayer === 'w') ? 'b' : 'w';
+        startTimer();
         render();
     }
 
+    // --- Network & Render ---
     function initNetwork() {
         const room = new URLSearchParams(window.location.search).get('room');
         peer = new Peer();
@@ -99,64 +143,64 @@
                 myColor = 'w';
                 const link = window.location.origin + window.location.pathname + '?room=' + id;
                 document.getElementById('copyLink').innerText = "🔗 COPY INVITE LINK";
-                document.getElementById('copyLink').onclick = () => { navigator.clipboard.writeText(link); alert("Link copied!"); };
+                document.getElementById('copyLink').onclick = () => { navigator.clipboard.writeText(link); alert("Copied!"); };
             } else {
                 myColor = 'b';
-                conn = peer.connect(room);
-                conn.on('open', () => render());
-                conn.on('data', data => { if(data.type==='move') executeMove(data.fr, data.fc, data.tr, data.tc); });
+                conn = peer.connect(room); setupConn();
             }
         });
-        peer.on('connection', c => { 
-            conn = c; 
-            conn.on('open', () => render()); 
-            conn.on('data', data => { if(data.type==='move') executeMove(data.fr, data.fc, data.tr, data.tc); });
-        });
+        peer.on('connection', c => { conn = c; setupConn(); });
+    }
+
+    function setupConn() {
+        conn.on('open', () => { startTimer(); render(); });
+        conn.on('data', data => { if(data.type==='move') executeMove(data.fr, data.fc, data.tr, data.tc); });
     }
 
     function render() {
-        const bEl = document.getElementById('board');
-        bEl.innerHTML = '';
-        document.getElementById('status').innerText = `${currentPlayer==='w'?'White':'Black'} Turn ${currentPlayer===myColor?'(YOU)':''}`;
+        const bEl = document.getElementById('board'); bEl.innerHTML = '';
+        const king = findKing(currentPlayer);
+        const inCheck = isSquareAttacked(king.r, king.c, currentPlayer === 'w' ? 'b' : 'w');
+        const sBar = document.getElementById('status');
+        sBar.classList.remove('check');
+
+        if (!gameOver) {
+            sBar.innerText = `${currentPlayer==='w'?'WHITE':'BLACK'} TURN ${currentPlayer===myColor?'(YOU)':''}`;
+            if (inCheck) { sBar.innerText += " - CHECK!"; sBar.classList.add('check'); }
+        }
 
         const rows = myColor === 'b' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
         for (let r of rows) {
             for (let c = 0; c < 8; c++) {
                 const s = document.createElement('div');
                 s.className = `square ${(r+c)%2===0?'dark':'light'}`;
-                if (selected && selected.r === r && selected.c === c) s.classList.add('selected');
-                
                 const p = board[r][c];
                 if (p) {
                     s.innerText = symbols[p];
                     s.style.color = p === p.toUpperCase() ? "white" : "black";
                     if(p === p.toUpperCase()) s.style.textShadow = "1px 1px 2px black";
                 }
-                
+                if (selected && selected.r === r && selected.c === c) s.classList.add('selected');
+                if (selected && canMove(selected.r, selected.c, r, c) && !wouldBeInCheck(selected.r, selected.c, r, c, myColor)) {
+                    const hint = document.createElement('div'); hint.className = p ? "dot capture" : "dot"; s.appendChild(hint);
+                }
                 s.onclick = () => {
-                    if (currentPlayer !== myColor) return;
+                    if (currentPlayer !== myColor || gameOver || !conn) return;
                     if (!selected) {
-                        if (p && (p === p.toUpperCase() ? 'w' : 'b') === myColor) {
-                            selected = {r, c};
-                            render();
-                        }
+                        if (p && (p === p.toUpperCase() ? 'w' : 'b') === myColor) { selected = {r, c}; render(); }
                     } else {
-                        if (canMove(selected.r, selected.c, r, c)) {
+                        if (canMove(selected.r, selected.c, r, c) && !wouldBeInCheck(selected.r, selected.c, r, c, myColor)) {
                             conn.send({type: 'move', fr: selected.r, fc: selected.c, tr: r, tc: c});
                             executeMove(selected.r, selected.c, r, c);
                         }
-                        selected = null;
-                        render();
+                        selected = null; render();
                     }
                 };
                 bEl.appendChild(s);
             }
         }
     }
-
-    initBoard();
-    initNetwork();
-    render();
+    initBoard(); initNetwork(); render();
 })();
 </script>
 </body>
