@@ -3,41 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>♜ P2P Multiplayer Chess</title>
+    <title>♜ Pro P2P Chess</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background-color: #1a2e3f; color: white; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 10px; }
         
-        .game-container { width: min(95vw, 500px); background: #2c3e50; border-radius: 20px; padding: 15px; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
+        .game-container { width: min(95vw, 500px); background: #2c3e50; border-radius: 20px; padding: 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); }
         
-        .status-bar { background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 10px; border: 1px solid #4a5f72; color: #ecf0f1; }
+        .status-bar { background: #1e2b38; padding: 12px; border-radius: 12px; text-align: center; font-weight: 800; margin-bottom: 10px; border: 1px solid #4a5f72; color: #ecf0f1; letter-spacing: 1px; }
         
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1/1; border: 4px solid #34495e; border-radius: 4px; overflow: hidden; background: #34495e; gap: 1px; }
+        .board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1/1; border: 4px solid #34495e; border-radius: 4px; overflow: hidden; background: #34495e; gap: 0; }
         
-        .square { display: flex; justify-content: center; align-items: center; font-size: min(9vw, 45px); cursor: pointer; background-color: #f0d9b5; transition: 0.1s; }
+        /* Fixed piece alignment */
+        .square { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: min(10vw, 45px); 
+            cursor: pointer; 
+            background-color: #f0d9b5; 
+            position: relative;
+            line-height: 0; /* Critical for centering symbols */
+        }
         .square.dark { background-color: #b58863; }
-        .square.selected { background-color: #fff2b5 !important; }
-        .square:active { transform: scale(0.95); }
+        .square.selected { background-color: #fff2b5 !important; box-shadow: inset 0 0 15px rgba(0,0,0,0.2); }
+        
+        /* Capture Styling */
+        .capture-zone { display: flex; justify-content: space-between; padding: 5px 10px; min-height: 40px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 8px; align-items: center; }
+        .caps { font-size: 1.2rem; letter-spacing: -3px; filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.3)); }
 
-        .capture-zone { display: flex; justify-content: space-between; padding: 5px 0; min-height: 35px; font-size: 1.2rem; background: rgba(0,0,0,0.1); border-radius: 5px; margin-bottom: 5px; }
-        .caps { padding: 0 10px; letter-spacing: -2px; }
-
-        .chat-area { margin-top: 15px; background: #1e2b38; border-radius: 10px; padding: 10px; border: 1px solid #4a5f72; }
-        #messages { height: 60px; overflow-y: auto; font-size: 0.85rem; color: #bdc3c7; margin-bottom: 8px; border-bottom: 1px solid #34495e; }
-        #chat-input { width: 100%; padding: 8px; border-radius: 5px; border: none; background: #2c3e50; color: white; outline: none; }
+        /* Chat & Buttons */
+        .chat-area { margin-top: 15px; background: #1e2b38; border-radius: 12px; padding: 10px; border: 1px solid #4a5f72; }
+        #messages { height: 70px; overflow-y: auto; font-size: 0.85rem; color: #bdc3c7; margin-bottom: 8px; padding-right: 5px; }
+        #chat-input { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #2c3e50; color: white; outline: none; border: 1px solid #34495e; }
 
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: #e67e22; color: white; box-shadow: 0 3px 0 #d35400; }
-        button:active { transform: translateY(2px); box-shadow: 0 1px 0 #d35400; }
+        button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: #e67e22; color: white; transition: 0.1s; }
+        button:active { transform: scale(0.98); opacity: 0.9; }
 
-        #copyLink { margin-top: 12px; font-size: 0.8rem; color: #e67e22; text-decoration: underline; cursor: pointer; text-align: center; }
+        #copyLink { margin-top: 15px; font-size: 0.75rem; color: #e67e22; font-weight: bold; cursor: pointer; text-align: center; background: rgba(230, 126, 34, 0.1); padding: 5px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="game-container">
-    <div id="status" class="status-bar">SETTING UP NETWORK...</div>
+    <div id="status" class="status-bar">INITIALIZING...</div>
     
     <div class="capture-zone">
         <div id="white-caps" class="caps"></div>
@@ -47,12 +58,12 @@
     <div class="board" id="board"></div>
 
     <div class="btn-group">
-        <button id="reset-btn">RESET GAME</button>
+        <button id="reset-btn">REQUEST NEW GAME</button>
     </div>
 
     <div class="chat-area">
-        <div id="messages">System: Connect with a friend to start...</div>
-        <input type="text" id="chat-input" placeholder="Send a message...">
+        <div id="messages">System: Connect a friend to play...</div>
+        <input type="text" id="chat-input" placeholder="Say hello...">
     </div>
 
     <div id="copyLink"></div>
@@ -60,7 +71,12 @@
 
 <script>
 (function() {
-    const symbols = {'r':'♜','n':'♞','b':'♝','q':'♛','k':'♚','p':'♟','R':'♖','N':'♘','B':'♗','Q':'♕','K':'♔','P':'♙'};
+    // Solid symbols work best for forced coloring
+    const symbols = {
+        'r':'♜','n':'♞','b':'♝','q':'♛','k':'♚','p':'♟',
+        'R':'♜','N':'♞','B':'♝','Q':'♛','K':'♚','P':'♟'
+    };
+    
     let board = [], currentPlayer = 'w', myColor = null, selected = null, peer, conn;
     let caps = { w: [], b: [] };
 
@@ -84,10 +100,10 @@
             if (!room) {
                 myColor = 'w';
                 const link = window.location.origin + window.location.pathname + '?room=' + id;
-                document.getElementById('copyLink').innerText = "COPY INVITE LINK";
+                document.getElementById('copyLink').innerText = "🔗 CLICK TO COPY INVITE LINK";
                 document.getElementById('copyLink').onclick = () => {
                     navigator.clipboard.writeText(link);
-                    addMsg("System: Link copied!");
+                    addMsg("System: Link copied! Send it to your friend.");
                 };
                 updateStatus("WAITING FOR OPPONENT...");
             } else {
@@ -106,13 +122,13 @@
 
     function bindEvents() {
         conn.on('open', () => {
-            addMsg("System: Opponent Connected.");
+            addMsg("System: Opponent Connected. Good luck!");
             render();
         });
         conn.on('data', data => {
             if (data.type === 'move') executeMove(data.fr, data.fc, data.tr, data.tc);
             if (data.type === 'chat') addMsg("Opponent: " + data.msg);
-            if (data.type === 'reset') if(confirm("Opponent wants to reset?")) { initBoard(); render(); }
+            if (data.type === 'reset') if(confirm("Opponent requested a new game. Reset?")) { initBoard(); render(); }
         });
     }
 
@@ -125,7 +141,6 @@
         board[tr][tc] = board[fr][fc];
         board[fr][fc] = '';
         
-        // Pawn Promotion
         if (board[tr][tc].toLowerCase() === 'p' && (tr === 0 || tr === 7)) {
             board[tr][tc] = (board[tr][tc] === 'p') ? 'q' : 'Q';
         }
@@ -151,7 +166,7 @@
         document.getElementById('white-caps').innerText = caps.w.join('');
         document.getElementById('black-caps').innerText = caps.b.join('');
 
-        // Perspective: White sees row 7 at bottom, Black sees row 0 at bottom
+        // Perspectives
         const rowOrder = myColor === 'w' ? [0,1,2,3,4,5,6,7].reverse() : [0,1,2,3,4,5,6,7];
         const colOrder = myColor === 'w' ? [0,1,2,3,4,5,6,7] : [0,1,2,3,4,5,6,7].reverse();
 
@@ -161,13 +176,19 @@
                 s.className = `square ${(r + c) % 2 === 0 ? 'dark' : 'light'}`;
                 if (selected && selected.r === r && selected.c === c) s.classList.add('selected');
                 
-                s.innerText = board[r][c] ? symbols[board[r][c]] : '';
+                const piece = board[r][c];
+                if (piece) {
+                    s.innerText = symbols[piece];
+                    const isWhite = piece === piece.toUpperCase();
+                    s.style.color = isWhite ? "#FFFFFF" : "#000000";
+                    // Add contrast shadow to white pieces
+                    if (isWhite) s.style.textShadow = "1px 1px 3px rgba(0,0,0,0.4)";
+                }
                 
                 s.onclick = () => {
                     if (!isMyTurn || !conn || !conn.open) return;
-                    const p = board[r][c];
                     if (!selected) {
-                        if (p && (p === p.toUpperCase() ? 'w' : 'b') === myColor) selected = {r, c};
+                        if (piece && (piece === piece.toUpperCase() ? 'w' : 'b') === myColor) selected = {r, c};
                     } else {
                         if (r !== selected.r || c !== selected.c) {
                             conn.send({type: 'move', fr: selected.r, fc: selected.c, tr: r, tc: c});
@@ -190,7 +211,12 @@
         }
     };
 
-    document.getElementById('reset-btn').onclick = () => { if(conn) conn.send({type: 'reset'}); };
+    document.getElementById('reset-btn').onclick = () => { 
+        if(conn) {
+            conn.send({type:'reset'});
+            addMsg("System: Reset request sent...");
+        } 
+    };
 
     initBoard();
     initNetwork();
