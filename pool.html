@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Pool P2P - Mobile Optimized</title>
+    <title>Pro Pool P2P - Turn Fixed</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: white; font-family: sans-serif; margin:0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
@@ -17,15 +17,17 @@
         #setup, #end-screen { position: fixed; inset: 0; background: rgba(13,17,23,0.98); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .btn { background: #eec27e; color: #3e2e14; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         input { padding: 12px; border-radius: 8px; margin-bottom: 10px; text-align: center; background: #111; color: white; border: 1px solid #eec27e; width: 200px; }
+        #conn-status { font-size: 10px; color: #888; margin-top: 5px; }
     </style>
 </head>
 <body>
     <div id="setup">
         <h1 style="color: #eec27e">POOL MASTER</h1>
         <div id="my-id" style="font-size:2rem; margin:10px; font-weight:bold;">...</div>
-        <input type="number" id="join-id" placeholder="Friend's Code">
+        <input type="number" id="join-id" placeholder="Partner Code">
         <button class="btn" onclick="connect()">JOIN MATCH</button>
-        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer; text-decoration: underline;">Practice Solo</button>
+        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer;">Practice Solo</button>
+        <div id="conn-status">Waiting for PeerJS...</div>
     </div>
 
     <div id="end-screen" style="display:none;">
@@ -34,15 +36,15 @@
     </div>
     
     <div id="ui">
-        <div id="turn">WAITING...</div>
-        <div id="status">REMAINING: 15</div>
+        <div id="turn">CONNECTING...</div>
+        <div id="status">BALLS: 15</div>
         <div id="pwr" style="color:#eec27e">POWER: 0%</div>
     </div>
     <canvas id="table" width="800" height="400"></canvas>
 
 <script>
     const canvas = document.getElementById('table'), ctx = canvas.getContext('2d');
-    let balls = [], isMyTurn = true, conn = null, moving = false, myRole = 'h', gameActive = true;
+    let balls = [], isMyTurn = true, conn = null, moving = false, gameActive = true;
     let mouse = {x:0, y:0, down:false};
     let ballsPocketedThisTurn = 0;
     const pockets = [[0,0],[400,0],[800,0],[0,400],[400,400],[800,400]];
@@ -55,16 +57,45 @@
     }
 
     const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
-    peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; myRole='h'; setupConn(); start(); });
+    peer.on('open', id => {
+        document.getElementById('my-id').innerText = id;
+        document.getElementById('conn-status').innerText = "Ready. Share your code!";
+    });
 
-    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myRole='g'; isMyTurn=false; setupConn(); start(); }
-    function setupConn() { conn.on('open', () => { conn.on('data', d => { 
-        if(d.type==='SYNC') { balls=d.balls; if(d.swap) isMyTurn=true; }
-        if(d.type==='WIN') endGame(false);
-    }); }); }
+    peer.on('connection', c => { 
+        conn = c; 
+        isMyTurn = true; // Host goes first
+        setupConn(); 
+        start(); 
+    });
 
-    function start(off=false) { document.getElementById('setup').style.display='none'; initRack(); if(off) isMyTurn=true; animate(); }
+    function connect() { 
+        const tid = document.getElementById('join-id').value; 
+        conn = peer.connect(tid); 
+        isMyTurn = false; // Guest goes second
+        setupConn(); 
+        start(); 
+    }
+
+    function setupConn() {
+        conn.on('open', () => {
+            conn.on('data', d => { 
+                if(d.type==='SYNC') { 
+                    balls = d.balls; 
+                    if(d.swap) isMyTurn = true; 
+                    moving = d.moving; 
+                }
+                if(d.type==='WIN') endGame(false);
+            });
+        });
+    }
+
+    function start(off=false) { 
+        document.getElementById('setup').style.display = 'none'; 
+        initRack(); 
+        if(off) isMyTurn = true; 
+        animate(); 
+    }
 
     function initRack() {
         balls = [{x:200, y:200, vx:0, vy:0, color:'#fff', type:'cue', sunk:false}];
@@ -77,14 +108,18 @@
     const handleDown = (e) => { if(isMyTurn && !moving && gameActive) { const p = getCoords(e); mouse.x=p.x; mouse.y=p.y; mouse.down=true; } };
     const handleMove = (e) => { const p = getCoords(e); mouse.x=p.x; mouse.y=p.y; if(e.touches) e.preventDefault(); };
     const handleUp = () => {
-        if(mouse.down) {
+        if(mouse.down && isMyTurn) {
             let dx = balls[0].x - mouse.x, dy = balls[0].y - mouse.y;
             let dist = Math.hypot(dx, dy);
-            if(dist > 10) {
+            if(dist > 15) {
                 let force = Math.min(dist/10, 18);
-                balls[0].vx = (dx/dist)*force; balls[0].vy = (dy/dist)*force;
-                moving = true; mouse.down = false; ballsPocketedThisTurn = 0;
-                if(conn) conn.send({type:'SYNC', balls, swap: false});
+                balls[0].vx = (dx/dist)*force; 
+                balls[0].vy = (dy/dist)*force;
+                moving = true; 
+                mouse.down = false; 
+                ballsPocketedThisTurn = 0;
+                // Immediate sync so opponent knows balls are moving
+                if(conn && conn.open) conn.send({type:'SYNC', balls, swap: false, moving: true});
             } else mouse.down = false;
         }
     };
@@ -95,8 +130,8 @@
 
     function resolvePhysics(b1, b2) {
         let dx = b2.x-b1.x, dy = b2.y-b1.y, dist = Math.hypot(dx, dy);
-        if (dist < 22) {
-            let nx = dx/dist, ny = dy/dist, overlap = 22.1 - dist;
+        if (dist < 22.1) {
+            let nx = dx/dist, ny = dy/dist, overlap = 22.2 - dist;
             b1.x -= nx*overlap/2; b1.y -= ny*overlap/2; b2.x += nx*overlap/2; b2.y += ny*overlap/2;
             let v1n = b1.vx*nx + b1.vy*ny, v2n = b2.vx*nx + b2.vy*ny, impulse = v1n - v2n;
             b1.vx -= impulse*nx; b1.vy -= impulse*ny; b2.vx += impulse*nx; b2.vy += impulse*ny;
@@ -107,8 +142,9 @@
 
     function animate() {
         ctx.clearRect(0,0,800,400); ctx.fillStyle = '#111'; pockets.forEach(p => { ctx.beginPath(); ctx.arc(p[0],p[1],28,0,7); ctx.fill(); });
+        
         let stillMoving = false;
-        for(let s=0; s<4; s++) { // High-speed physics sub-stepping
+        for(let s=0; s<4; s++) { 
             balls.forEach((b, i) => {
                 if(b.sunk) return;
                 b.x += b.vx/4; b.y += b.vy/4;
@@ -124,26 +160,37 @@
                 for(let j=i+1; j<balls.length; j++) if(!balls[j].sunk) resolvePhysics(b, balls[j]);
             });
         }
+
         balls.forEach(b => {
             if(b.sunk) return;
             b.vx *= 0.985; b.vy *= 0.985;
-            if(Math.hypot(b.vx, b.vy) > 0.2) stillMoving = true; else { b.vx=0; b.vy=0; }
+            if(Math.hypot(b.vx, b.vy) > 0.25) stillMoving = true; else { b.vx=0; b.vy=0; }
             ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, 11, 0, 7); ctx.fill();
-            ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.stroke();
+            ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.stroke();
         });
-        moving = stillMoving;
+
+        // TURN SWAP LOGIC (The Fix)
+        if (moving && !stillMoving) {
+            moving = false;
+            if (isMyTurn) {
+                let swapTurn = (ballsPocketedThisTurn === 0);
+                if (swapTurn) isMyTurn = false;
+                if (conn && conn.open) conn.send({type: 'SYNC', balls: balls, swap: swapTurn, moving: false});
+            }
+        }
+
         if(isMyTurn && !moving && !balls[0].sunk && gameActive) {
             let dx = balls[0].x-mouse.x, dy = balls[0].y-mouse.y, ang = Math.atan2(dy, dx), dist = Math.hypot(dx, dy);
             ctx.save(); ctx.translate(balls[0].x, balls[0].y); ctx.rotate(ang);
-            ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(255,255,255,0.4)"; ctx.beginPath(); ctx.moveTo(15,0); ctx.lineTo(300,0); ctx.stroke();
-            ctx.setLineDash([]); ctx.fillStyle="#5d3a1a"; let pull = mouse.down ? Math.min(dist/5, 40) : 0;
+            ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.moveTo(15,0); ctx.lineTo(300,0); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle="#5d3a1a"; let pull = mouse.down ? Math.min(dist/5, 45) : 0;
             ctx.fillRect(-40-pull, -4, 250, 8); ctx.strokeStyle="#eec27e"; ctx.strokeRect(-40-pull, -4, 250, 8); ctx.restore();
             document.getElementById('pwr').innerText = "POWER: " + Math.round(Math.min(dist/10, 18)*5.5) + "%";
         }
+
         document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
-        document.getElementById('status').innerText = "REMAINING: " + (balls.filter(b=>!b.sunk && b.color!=='#fff').length);
-        if(!stillMoving && ballsPocketedThisTurn === 0 && !isMyTurn && moving) { /* turn swap logic happens here via P2P */ }
-        if(moving && !stillMoving) { moving = false; let swap = (ballsPocketedThisTurn === 0); if(isMyTurn) { isMyTurn = !swap; if(conn) conn.send({type:'SYNC', balls, swap}); } }
+        document.getElementById('status').innerText = "BALLS: " + (balls.filter(b=>!b.sunk && b.color!=='#fff').length);
+        
         if(gameActive) requestAnimationFrame(animate);
     }
 </script>
