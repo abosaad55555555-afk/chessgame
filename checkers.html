@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>P2P Checkers Pro</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --sq: min(12vw, 55px); }
+        body { background: #0d1117; color: white; font-family: sans-serif; margin:0; display: flex; flex-direction: column; align-items: center; }
+        #board { display: grid; grid-template-columns: repeat(8, var(--sq)); border: 6px solid #333; margin-top: 15px; }
+        .sq { width: var(--sq); height: var(--sq); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .l { background: #f0d9b5; } .d { background: #b58863; }
+        .sel { background: #bbcb2b !important; }
+        .piece { width: 80%; height: 80%; border-radius: 50%; border: 2px solid #000; }
+        .p-w { background: #fff; } .p-b { background: #d33; }
+        .king { border: 4px solid #ffd700 !important; }
+        #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <h1 style="color: #eec27e">LOBBY</h1>
+        <div id="my-id" style="font-size:3rem; margin:10px;">...</div>
+        <input type="number" id="join-id" style="padding:15px; text-align:center; margin-bottom:10px;">
+        <button class="btn" onclick="connect()">JOIN</button>
+        <button onclick="start()" style="margin-top:20px; color:#eec27e; background:none; border:none;">Practice</button>
+    </div>
+    <div id="turn" style="background:#161b22; width:100%; padding:15px; text-align:center; border-bottom:2px solid #eec27e;">WAITING...</div>
+    <div id="board"></div>
+<script>
+    const boardEl = document.getElementById('board');
+    let game = [['','b','','b','','b','','b'],['b','','b','','b','','b',''],['','b','','b','','b','','b'],['','','','','','','',''],['','','','','','','',''],['w','','w','','w','','w',''],['','w','','w','','w','','w'],['w','','w','','w','','w','']];
+    let isMyTurn = true, myCol = 'w', conn = null, sel = null;
+    const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => { conn = c; isMyTurn = true; myCol = 'w'; start(); });
+    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myCol = 'b'; isMyTurn = false; start(); }
+    function start() { document.getElementById('setup').style.display='none'; if(conn) conn.on('data', d => { game = d.game; isMyTurn = true; render(); }); render(); }
+    function isValid(fr, fc, tr, tc) {
+        const p = game[fr][fc], dr = tr - fr, dc = Math.abs(tc - fc);
+        const isK = p.includes('K'), type = p[0], fwd = (type === 'w' || isK) && dr < 0, bwd = (type === 'b' || isK) && dr > 0;
+        if(dc === 1 && (fwd || bwd)) return {j: false};
+        if(dc === 2 && (fwd || bwd)) {
+            const mr = fr + dr/2, mc = fc + (tc-fc)/2;
+            if(game[mr][mc] && game[mr][mc][0] !== type) return {j: true, mr, mc};
+        }
+        return null;
+    }
+    function render() {
+        boardEl.innerHTML = ''; document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
+        for(let r=0; r<8; r++) for(let c=0; c<8; c++) {
+            const s = document.createElement('div'); s.className = `sq ${(r+c)%2===0?'l':'d'}`;
+            if(sel && sel.r===r && sel.c===c) s.classList.add('sel');
+            if(game[r][c]) s.innerHTML = `<div class="piece p-${game[r][c][0]} ${game[r][c].includes('K')?'king':''}"></div>`;
+            s.onclick = () => {
+                if(!isMyTurn) return;
+                if(sel) {
+                    const m = isValid(sel.r, sel.c, r, c);
+                    if(!game[r][c] && m) {
+                        let p = game[sel.r][sel.c]; if((myCol==='w'&&r===0)||(myCol==='b'&&r===7)) p=p[0]+'K';
+                        game[r][c] = p; game[sel.r][sel.c] = ''; if(m.j) game[m.mr][m.mc] = '';
+                        sel = null; isMyTurn = false; if(conn) conn.send({game}); render();
+                    } else sel = null; render();
+                } else if(game[r][c][0] === myCol) { sel = {r,c}; render(); }
+            };
+            boardEl.appendChild(s);
+        }
+    }
+</script>
+</body>
+</html>

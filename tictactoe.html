@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tic-Tac-Toe Pro</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #0d1117; color: white; font-family: sans-serif; margin:0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        #board { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; }
+        .sq { width: 100px; height: 100px; background: #161b22; border: 2px solid #30363d; display: flex; align-items: center; justify-content: center; font-size: 3rem; cursor: pointer; border-radius: 12px; }
+        #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <h1 style="color:#eec27e">TIC-TAC-TOE</h1>
+        <div id="my-id" style="font-size:3rem; margin:15px;">...</div>
+        <input type="number" id="join-id" style="padding:15px; text-align:center; margin-bottom:10px; border-radius:8px;">
+        <button class="btn" onclick="connect()">JOIN</button>
+    </div>
+    <div id="turn" style="font-size: 1.5rem; color: #eec27e; margin-bottom: 20px;">WAITING...</div>
+    <div id="board"></div>
+    <button id="res" onclick="location.reload()" style="display:none; margin-top:20px; background:#eec27e; padding:10px; border-radius:5px; border:none; font-weight:bold;">NEW GAME</button>
+<script>
+    const boardEl = document.getElementById('board');
+    let state = Array(9).fill(''), isMyTurn = true, myChar = 'X', conn = null;
+    const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => { conn = c; isMyTurn = true; myChar = 'X'; start(); });
+    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myChar = 'O'; isMyTurn = false; start(); }
+    function start() { document.getElementById('setup').style.display='none'; if(conn) conn.on('data', d => { state = d.state; isMyTurn = true; render(); }); render(); }
+    function checkWin() {
+        const w = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for(let l of w) if(state[l[0]] && state[l[0]]===state[l[1]] && state[l[0]]===state[l[2]]) return state[l[0]];
+        return state.includes('') ? null : 'draw';
+    }
+    function render() {
+        boardEl.innerHTML = ''; const win = checkWin();
+        document.getElementById('turn').innerText = win ? (win==='draw'?"DRAW!":win+" WINS!") : (isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN");
+        if(win) document.getElementById('res').style.display='block';
+        state.forEach((v, i) => {
+            const s = document.createElement('div'); s.className = 'sq'; s.innerText = v;
+            s.onclick = () => { if(!isMyTurn || state[i] || win) return; state[i] = myChar; isMyTurn = false; if(conn) conn.send({state}); render(); };
+            boardEl.appendChild(s);
+        });
+    }
+</script>
+</body>
+</html>

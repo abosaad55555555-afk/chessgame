@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>P2P Chess</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #000; color: white; font-family: sans-serif; margin:0; display: flex; flex-direction: column; align-items: center; }
+        #ui { background: #161b22; width: 100%; padding: 10px; border-bottom: 2px solid #eec27e; text-align: center; }
+        #board { display: grid; grid-template-columns: repeat(8, 45px); grid-template-rows: repeat(8, 45px); border: 5px solid #333; margin-top: 20px; }
+        .sq { width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; }
+        .l { background: #f0d9b5; } .d { background: #b58863; }
+        .sel { background: #bbcb2b !important; }
+        #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <h1 style="color: #eec27e">CHESS LOBBY</h1>
+        <div id="my-id" style="font-size: 3rem; margin: 20px; color: white;">LOADING...</div>
+        <input type="number" id="join-id" style="padding:10px; margin-bottom:10px;">
+        <button class="btn" onclick="connect()">CONNECT</button>
+        <button onclick="start()" style="margin-top:20px; color:#eec27e; background:none; border:none; text-decoration:underline;">Offline Board</button>
+    </div>
+    <div id="ui"><div id="turn">WAITING...</div></div>
+    <div id="board"></div>
+
+<script>
+    const boardEl = document.getElementById('board');
+    let game = [['rb','nb','bb','qb','kb','bb','nb','rb'],['pb','pb','pb','pb','pb','pb','pb','pb'],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['pw','pw','pw','pw','pw','pw','pw','pw'],['rw','nw','bw','qw','kw','bw','nw','rw']];
+    const icons = {'rw':'♖','nw':'♘','bw':'♗','qw':'♕','kw':'♔','pw':'♙','rb':'♜','nb':'♞','bb':'♝','qb':'♛','kb':'♚','pb':'♟'};
+    let isMyTurn = true, myCol = 'w', conn = null, sel = null;
+
+    const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => { conn = c; isMyTurn = true; myCol = 'w'; start(); });
+
+    function connect() { 
+        const tid = document.getElementById('join-id').value;
+        conn = peer.connect(tid); myCol = 'b'; isMyTurn = false; start(); 
+    }
+
+    function start() {
+        document.getElementById('setup').style.display = 'none';
+        render();
+        if(conn) {
+            conn.on('open', () => {
+                conn.on('data', d => { game = d.game; isMyTurn = true; render(); });
+            });
+        }
+    }
+
+    function render() {
+        boardEl.innerHTML = '';
+        document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
+        for(let r=0; r<8; r++) {
+            for(let c=0; c<8; c++) {
+                const s = document.createElement('div');
+                s.className = `sq ${(r+c)%2===0?'l':'d'}`;
+                if(sel && sel.r===r && sel.c===c) s.classList.add('sel');
+                s.innerText = icons[game[r][c]] || '';
+                s.onclick = () => {
+                    if(!isMyTurn) return;
+                    if(sel) {
+                        game[r][c] = game[sel.r][sel.c]; game[sel.r][sel.c] = '';
+                        sel = null; if(conn) { isMyTurn = false; conn.send({game}); } render();
+                    } else if(game[r][c].endsWith(myCol)) { sel = {r,c}; render(); }
+                };
+                boardEl.appendChild(s);
+            }
+        }
+    }
+</script>
+</body>
+</html>
