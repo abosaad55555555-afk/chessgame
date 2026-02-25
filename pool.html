@@ -2,145 +2,144 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Master P2P Pool</title>
+    <title>Pro Pool Simulation</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; margin:0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        #ui { background: #163a2a; width: 100%; padding: 12px; border-bottom: 2px solid #eec27e; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
-        canvas { background: radial-gradient(circle, #239f30, #0a621a); border: 10px solid #5d3a1a; border-radius: 15px; margin-top: 10px; touch-action: none; max-width: 95vw; cursor: crosshair; }
-        #setup { position: fixed; inset: 0; background: #0a1a10; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        #my-id { font-size: 3.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 15px #eec27e; margin: 10px; }
-        input { padding: 15px; border-radius: 8px; margin-bottom: 10px; text-align: center; background: #05140b; color: white; border: 1px solid #eec27e; }
+        body { background: #050505; color: white; font-family: sans-serif; margin:0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        #ui { background: #1a3a2a; width: 100%; padding: 15px; border-bottom: 3px solid #eec27e; display: flex; justify-content: space-between; box-sizing: border-box; }
+        canvas { background: radial-gradient(circle, #2a8c3d, #0e4d1f); border: 12px solid #3d2616; border-radius: 8px; margin-top: 10px; cursor: crosshair; touch-action: none; }
+        #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { background: #eec27e; color: #3e2e14; padding: 15px 35px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        input { padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: center; background: #111; color: white; border: 1px solid #eec27e; }
     </style>
 </head>
 <body>
     <div id="setup">
-        <h1 style="color: #eec27e">POOL MASTER</h1>
-        <div id="my-id">...</div>
-        <input type="number" id="join-id" placeholder="Code">
-        <button class="btn" onclick="connect()">JOIN ROOM</button>
-        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer;">Practice</button>
+        <h1 style="color: #eec27e">POOL SIM v1.0</h1>
+        <div id="my-id" style="font-size:3rem; margin:15px; font-weight:bold;">...</div>
+        <input type="number" id="join-id" placeholder="Opponent Code">
+        <button class="btn" onclick="connect()">CONNECT</button>
+        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer;">Test Solo</button>
     </div>
+    
     <div id="ui">
-        <button onclick="location.href='index.html'" style="color:white; background:none; border:1px solid #eec27e; padding:5px 15px; border-radius:5px;">HUB</button>
         <div id="turn">WAITING...</div>
-        <div id="power" style="color:#eec27e; font-weight:bold; width:120px; text-align:right;">POWER: 0%</div>
+        <div id="pwr" style="color:#eec27e; font-weight:bold">POWER: 0%</div>
     </div>
     <canvas id="table" width="800" height="400"></canvas>
 
 <script>
     const canvas = document.getElementById('table'), ctx = canvas.getContext('2d');
-    let balls = [], isMyTurn = true, myRole = 'h', conn = null, moving = false;
+    let balls = [], isMyTurn = true, conn = null, moving = false, myRole = 'h';
     let mouse = {x:0, y:0, down:false};
     const pockets = [[0,0],[400,0],[800,0],[0,400],[400,400],[800,400]];
 
     const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; isMyTurn = true; myRole = 'h'; setupConn(); start(); });
+    peer.on('connection', c => { conn = c; myRole='h'; setupConn(); start(); });
 
-    function connect() {
-        const tid = document.getElementById('join-id').value;
-        conn = peer.connect(tid); myRole = 'g'; isMyTurn = false; setupConn(); start();
-    }
-
-    function setupConn() {
-        conn.on('open', () => {
-            conn.on('data', d => { if(d.type==='SYNC'){ balls=d.balls; if(d.swap) isMyTurn=true; } });
-        });
-    }
-
-    function start(off = false) {
-        document.getElementById('setup').style.display = 'none';
-        initRack();
-        if(off) isMyTurn = true;
-        animate();
-    }
+    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myRole='g'; isMyTurn=false; setupConn(); start(); }
+    function setupConn() { conn.on('open', () => { conn.on('data', d => { if(d.type==='SYNC'){ balls=d.balls; if(d.swap) isMyTurn=true; } }); }); }
+    function start(off=false) { document.getElementById('setup').style.display='none'; initRack(); if(off) isMyTurn=true; animate(); }
 
     function initRack() {
         balls = [{x:200, y:200, vx:0, vy:0, color:'#fff', type:'cue', sunk:false}];
-        for(let c=0; c<5; c++) for(let r=0; r<=c; r++) {
-            let col = (c===2 && r===1) ? '#000' : ((c+r)%2===0 ? '#f33' : '#ff3');
-            balls.push({ x: 550+(c*21), y: 200+(r*23)-(c*11.5), vx:0, vy:0, color: col, sunk:false });
+        for(let i=0; i<5; i++) {
+            for(let j=0; j<=i; j++) {
+                let color = (i===2 && j===1) ? '#000' : ((i+j)%2===0 ? '#f33' : '#ff3');
+                balls.push({x: 550 + i*19.5, y: 200 + j*22 - i*11, vx:0, vy:0, color: color, sunk:false});
+            }
         }
     }
 
     canvas.onmousemove = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = (e.clientX - rect.left) * (800 / rect.width);
-        mouse.y = (e.clientY - rect.top) * (400 / rect.height);
+        const r = canvas.getBoundingClientRect();
+        mouse.x = (e.clientX - r.left) * (800 / r.width);
+        mouse.y = (e.clientY - r.top) * (400 / r.height);
     };
     canvas.onmousedown = () => { if(isMyTurn && !moving) mouse.down = true; };
     canvas.onmouseup = () => {
         if(mouse.down) {
-            const dx = balls[0].x - mouse.x, dy = balls[0].y - mouse.y;
-            const dist = Math.hypot(dx, dy);
-            const power = Math.min(dist / 12, 16);
-            balls[0].vx = (dx / dist) * power;
-            balls[0].vy = (dy / dist) * power;
+            let dx = balls[0].x - mouse.x, dy = balls[0].y - mouse.y;
+            let dist = Math.hypot(dx, dy);
+            let force = Math.min(dist/10, 20);
+            balls[0].vx = (dx/dist) * force;
+            balls[0].vy = (dy/dist) * force;
             moving = true; isMyTurn = false; mouse.down = false;
             if(conn) conn.send({type:'SYNC', balls, swap: false});
         }
     };
 
+    function resolvePhysics(b1, b2) {
+        let dx = b2.x - b1.x, dy = b2.y - b1.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist < 22) {
+            // Static collision resolution (un-sticking)
+            let overlap = 22.1 - dist;
+            let nx = dx / dist, ny = dy / dist;
+            b1.x -= nx * overlap / 2; b1.y -= ny * overlap / 2;
+            b2.x += nx * overlap / 2; b2.y += ny * overlap / 2;
+
+            // Elastic Collision (impulse along normal)
+            let v1n = b1.vx * nx + b1.vy * ny;
+            let v2n = b2.vx * nx + b2.vy * ny;
+            let impulse = v1n - v2n;
+            b1.vx -= impulse * nx; b1.vy -= impulse * ny;
+            b2.vx += impulse * nx; b2.vy += impulse * ny;
+        }
+    }
+
     function animate() {
         ctx.clearRect(0,0,800,400);
-        ctx.fillStyle = '#000';
-        pockets.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 28, 0, 7); ctx.fill(); });
+        ctx.fillStyle = '#111'; pockets.forEach(p => { ctx.beginPath(); ctx.arc(p[0],p[1],28,0,7); ctx.fill(); });
 
         let stillMoving = false;
-        balls.forEach((b, i) => {
-            if(b.sunk) return;
-            b.x += b.vx; b.y += b.vy; b.vx *= 0.988; b.vy *= 0.988;
-            if(Math.abs(b.vx) > 0.05 || Math.abs(b.vy) > 0.05) stillMoving = true;
+        // Sub-stepping loop (5x precision)
+        for(let s=0; s<5; s++) {
+            balls.forEach((b, i) => {
+                if(b.sunk) return;
+                b.x += b.vx / 5; b.y += b.vy / 5;
+                
+                // Cushion logic
+                if(b.x<11 || b.x>789) { b.vx *= -0.85; b.x = b.x<11?11:789; }
+                if(b.y<11 || b.y>389) { b.vy *= -0.85; b.y = b.y<11?11:389; }
 
-            pockets.forEach(p => {
-                if(Math.hypot(b.x-p[0], b.y-p[1]) < 26) {
-                    b.sunk = true; b.vx = b.vy = 0;
-                    if(b.type === 'cue') setTimeout(() => { b.sunk=false; b.x=200; b.y=200; }, 500);
-                    if(b.color === '#000') alert("8-BALL SUNK! RESETTING...");
-                }
+                pockets.forEach(p => {
+                    if(Math.hypot(b.x-p[0], b.y-p[1]) < 26) {
+                        b.sunk = true; b.vx = b.vy = 0;
+                        if(b.type === 'cue') setTimeout(() => { b.sunk=false; b.x=200; b.y=200; }, 500);
+                    }
+                });
+                for(let j=i+1; j<balls.length; j++) if(!balls[j].sunk) resolvePhysics(b, balls[j]);
             });
+        }
 
-            if(b.x<12 || b.x>788) b.vx *= -0.85; if(b.y<12 || b.y>388) b.vy *= -0.85;
-
-            for(let j=i+1; j<balls.length; j++){
-                let b2 = balls[j]; if(b2.sunk) continue;
-                let d = Math.hypot(b2.x-b.x, b2.y-b.y);
-                if(d < 22){
-                    let tx = b.vx, ty = b.vy; b.vx = b2.vx; b.vy = b2.vy; b2.vx = tx; b2.vy = ty;
-                    let overlap = 22.1 - d, nx = (b2.x-b.x)/d, ny = (b2.y-b.y)/d;
-                    b.x -= nx*overlap/2; b.y -= ny*overlap/2; b2.x += nx*overlap/2; b2.y += ny*overlap/2;
-                }
-            }
+        balls.forEach(b => {
+            if(b.sunk) return;
+            b.vx *= 0.985; b.vy *= 0.985; // Natural decay
+            if(Math.hypot(b.vx, b.vy) < 0.1) { b.vx = 0; b.vy = 0; } else { stillMoving = true; }
             ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, 11, 0, 7); ctx.fill();
-            ctx.strokeStyle = "white"; ctx.lineWidth=1; ctx.stroke();
+            ctx.strokeStyle = "white"; ctx.stroke();
         });
 
         if(isMyTurn && !moving && !balls[0].sunk) {
-            const angle = Math.atan2(mouse.y - balls[0].y, mouse.x - balls[0].x);
-            const dist = Math.hypot(mouse.x - balls[0].x, mouse.y - balls[0].y);
-            const offset = mouse.down ? Math.min(dist/5, 50) : 25;
-
-            ctx.save();
-            ctx.translate(balls[0].x, balls[0].y);
-            ctx.rotate(angle);
-            // Aiming guide line
-            ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(255,255,255,0.4)";
-            ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(-250, 0); ctx.stroke();
-            // Cue Stick
-            ctx.setLineDash([]); ctx.fillStyle = "#5d3a1a";
-            ctx.fillRect(offset, -3, 220, 6);
-            ctx.fillStyle = "#fff"; ctx.fillRect(offset, -3, 8, 6); // Cue Tip
+            let dx = balls[0].x - mouse.x, dy = balls[0].y - mouse.y;
+            let angle = Math.atan2(dy, dx);
+            let dist = Math.hypot(dx, dy);
+            ctx.save(); ctx.translate(balls[0].x, balls[0].y); ctx.rotate(angle);
+            ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(255,255,255,0.4)";
+            ctx.beginPath(); ctx.moveTo(15,0); ctx.lineTo(300,0); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle="#5d3a1a";
+            ctx.fillRect(mouse.down ? -30 - dist/5 : -30, -3, 200, 6);
             ctx.restore();
-            
-            document.getElementById('power').innerText = `POWER: ${Math.round(Math.min(dist/12, 16)*6.2)}%`;
-        } else {
-            document.getElementById('power').innerText = `POWER: 0%`;
+            document.getElementById('pwr').innerText = "POWER: " + Math.round(Math.min(dist/10, 20)*5) + "%";
         }
 
         document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
-        if(moving && !stillMoving) { moving = false; if(conn && myRole===(isMyTurn?'g':'h')) conn.send({type:'SYNC', balls, swap: true}); }
+        if(moving && !stillMoving) {
+            moving = false;
+            if(conn && myRole===(isMyTurn?'g':'h')) conn.send({type:'SYNC', balls, swap: true});
+        }
         requestAnimationFrame(animate);
     }
 </script>
