@@ -1,48 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tic-Tac-Toe Pro</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XO Pro P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #0d1117; color: white; font-family: sans-serif; margin:0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        #board { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; }
-        .sq { width: 100px; height: 100px; background: #161b22; border: 2px solid #30363d; display: flex; align-items: center; justify-content: center; font-size: 3rem; cursor: pointer; border-radius: 12px; }
+        body { background: #0d1117; color: white; font-family: system-ui; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 90vw; max-width: 350px; aspect-ratio: 1/1; }
+        .cell { background: #161b22; border: 2px solid #30363d; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 4rem; font-weight: 800; cursor: pointer; transition: 0.2s; }
+        .cell:active { transform: scale(0.95); background: #21262d; }
+        .X { color: #ff7b72; } .O { color: #58a6ff; }
         #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; }
+        .btn { background: #238636; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; }
+        #status { margin-bottom: 20px; font-size: 1.5rem; color: #8b949e; }
     </style>
 </head>
 <body>
     <div id="setup">
-        <h1 style="color:#eec27e">TIC-TAC-TOE</h1>
-        <div id="my-id" style="font-size:3rem; margin:15px;">...</div>
-        <input type="number" id="join-id" style="padding:15px; text-align:center; margin-bottom:10px; border-radius:8px;">
-        <button class="btn" onclick="connect()">JOIN</button>
+        <h1 style="font-size: 3rem; margin-bottom: 0;">XO PRO</h1>
+        <p style="color: #8b949e;">Multiplayer Edition</p>
+        <div id="my-id" style="font-size: 2.5rem; margin: 20px; color: #58a6ff; font-weight: bold;">...</div>
+        <input type="number" id="join-id" style="padding:15px; border-radius:8px; border:1px solid #30363d; background:#010409; color:white; text-align:center; margin-bottom:15px;" placeholder="Friend's Code">
+        <button class="btn" onclick="connect()">JOIN MATCH</button>
     </div>
-    <div id="turn" style="font-size: 1.5rem; color: #eec27e; margin-bottom: 20px;">WAITING...</div>
-    <div id="board"></div>
-    <button id="res" onclick="location.reload()" style="display:none; margin-top:20px; background:#eec27e; padding:10px; border-radius:5px; border:none; font-weight:bold;">NEW GAME</button>
+
+    <div id="status">CONNECTING...</div>
+    <div id="grid"></div>
+
 <script>
-    const boardEl = document.getElementById('board');
-    let state = Array(9).fill(''), isMyTurn = true, myChar = 'X', conn = null;
+    let cells = Array(9).fill(null), turn = false, mySym = 'X', conn = null, active = true;
+    const gridEl = document.getElementById('grid');
+
     const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; isMyTurn = true; myChar = 'X'; start(); });
-    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myChar = 'O'; isMyTurn = false; start(); }
-    function start() { document.getElementById('setup').style.display='none'; if(conn) conn.on('data', d => { state = d.state; isMyTurn = true; render(); }); render(); }
-    function checkWin() {
-        const w = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-        for(let l of w) if(state[l[0]] && state[l[0]]===state[l[1]] && state[l[0]]===state[l[2]]) return state[l[0]];
-        return state.includes('') ? null : 'draw';
+    peer.on('connection', c => { conn = c; turn = true; mySym = 'X'; setup(); start(); });
+
+    function connect() {
+        const tid = document.getElementById('join-id').value;
+        conn = peer.connect(tid); turn = false; mySym = 'O'; setup(); start();
     }
+
+    function setup() {
+        conn.on('data', d => {
+            if(d.t === 'M') { cells = d.c; turn = true; checkWin(); render(); }
+            if(d.t === 'RESET') location.reload();
+        });
+    }
+
+    function start() { document.getElementById('setup').style.display='none'; render(); }
+
+    function checkWin() {
+        const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for(let w of wins) {
+            if(cells[w[0]] && cells[w[0]] === cells[w[1]] && cells[w[0]] === cells[w[2]]) {
+                active = false;
+                document.getElementById('status').innerText = cells[w[0]] + " WINS!";
+                return;
+            }
+        }
+        if(!cells.includes(null)) { active = false; document.getElementById('status').innerText = "DRAW!"; }
+    }
+
     function render() {
-        boardEl.innerHTML = ''; const win = checkWin();
-        document.getElementById('turn').innerText = win ? (win==='draw'?"DRAW!":win+" WINS!") : (isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN");
-        if(win) document.getElementById('res').style.display='block';
-        state.forEach((v, i) => {
-            const s = document.createElement('div'); s.className = 'sq'; s.innerText = v;
-            s.onclick = () => { if(!isMyTurn || state[i] || win) return; state[i] = myChar; isMyTurn = false; if(conn) conn.send({state}); render(); };
-            boardEl.appendChild(s);
+        gridEl.innerHTML = '';
+        if(active) document.getElementById('status').innerText = turn ? `YOUR TURN (${mySym})` : "WAITING...";
+        cells.forEach((val, i) => {
+            const div = document.createElement('div');
+            div.className = `cell ${val||''}`;
+            div.innerText = val || '';
+            div.onclick = () => {
+                if(turn && !cells[i] && active) {
+                    cells[i] = mySym; turn = false;
+                    checkWin();
+                    if(conn) conn.send({t:'M', c: cells});
+                    render();
+                }
+            };
+            gridEl.appendChild(div);
         });
     }
 </script>

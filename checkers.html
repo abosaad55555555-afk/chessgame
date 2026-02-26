@@ -1,70 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Checkers Pro</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkers Pro P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --sq: min(12vw, 55px); }
-        body { background: #0d1117; color: white; font-family: sans-serif; margin:0; display: flex; flex-direction: column; align-items: center; }
-        #board { display: grid; grid-template-columns: repeat(8, var(--sq)); border: 6px solid #333; margin-top: 15px; }
-        .sq { width: var(--sq); height: var(--sq); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .l { background: #f0d9b5; } .d { background: #b58863; }
-        .sel { background: #bbcb2b !important; }
-        .piece { width: 80%; height: 80%; border-radius: 50%; border: 2px solid #000; }
-        .p-w { background: #fff; } .p-b { background: #d33; }
-        .king { border: 4px solid #ffd700 !important; }
-        #setup { position: fixed; inset: 0; background: #0d1117; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { background: #eec27e; color: #3e2e14; padding: 15px 30px; border: none; border-radius: 8px; font-weight: bold; }
+        :root { --sq: calc(min(98vw, 450px) / 8); }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        #board { display: grid; grid-template-columns: repeat(8, var(--sq)); grid-template-rows: repeat(8, var(--sq)); border: 5px solid #333; margin-top: 20px; }
+        .sq { width: var(--sq); height: var(--sq); display: flex; justify-content: center; align-items: center; }
+        .dk { background: #4d3124; } .lt { background: #eec27e; }
+        .p { width: 80%; height: 80%; border-radius: 50%; border: 2px solid rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.5rem; }
+        .red { background: #d32f2f; } .blk { background: #212121; }
+        .k::after { content: 'K'; color: rgba(255,255,255,0.5); }
+        .sel { outline: 4px solid white; outline-offset: -2px; }
+        #setup { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
     <div id="setup">
-        <h1 style="color: #eec27e">LOBBY</h1>
-        <div id="my-id" style="font-size:3rem; margin:10px;">...</div>
-        <input type="number" id="join-id" style="padding:15px; text-align:center; margin-bottom:10px;">
-        <button class="btn" onclick="connect()">JOIN</button>
-        <button onclick="start()" style="margin-top:20px; color:#eec27e; background:none; border:none;">Practice</button>
+        <h1 style="color:#eec27e">CHECKERS PRO</h1>
+        <div id="my-id" style="font-size: 2rem; margin: 10px;">...</div>
+        <input type="number" id="join-id" style="padding:12px;" placeholder="Partner ID">
+        <button onclick="connect()" style="padding:12px 24px; background:#eec27e; border:none; border-radius:8px; margin-top:10px;">PLAY</button>
     </div>
-    <div id="turn" style="background:#161b22; width:100%; padding:15px; text-align:center; border-bottom:2px solid #eec27e;">WAITING...</div>
+    <h3 id="st" style="margin-top:20px;">WAITING...</h3>
     <div id="board"></div>
+
 <script>
-    const boardEl = document.getElementById('board');
-    let game = [['','b','','b','','b','','b'],['b','','b','','b','','b',''],['','b','','b','','b','','b'],['','','','','','','',''],['','','','','','','',''],['w','','w','','w','','w',''],['','w','','w','','w','','w'],['w','','w','','w','','w','']];
-    let isMyTurn = true, myCol = 'w', conn = null, sel = null;
+    const bEl = document.getElementById('board');
+    let b = [], sel = null, turn = false, myCol = 'red', conn = null;
+
     const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; isMyTurn = true; myCol = 'w'; start(); });
-    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); myCol = 'b'; isMyTurn = false; start(); }
-    function start() { document.getElementById('setup').style.display='none'; if(conn) conn.on('data', d => { game = d.game; isMyTurn = true; render(); }); render(); }
-    function isValid(fr, fc, tr, tc) {
-        const p = game[fr][fc], dr = tr - fr, dc = Math.abs(tc - fc);
-        const isK = p.includes('K'), type = p[0], fwd = (type === 'w' || isK) && dr < 0, bwd = (type === 'b' || isK) && dr > 0;
-        if(dc === 1 && (fwd || bwd)) return {j: false};
-        if(dc === 2 && (fwd || bwd)) {
-            const mr = fr + dr/2, mc = fc + (tc-fc)/2;
-            if(game[mr][mc] && game[mr][mc][0] !== type) return {j: true, mr, mc};
-        }
-        return null;
-    }
-    function render() {
-        boardEl.innerHTML = ''; document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
+    peer.on('connection', c => { conn = c; turn = true; myCol = 'red'; setup(); start(); });
+
+    function connect() { const tid = document.getElementById('join-id').value; conn = peer.connect(tid); turn = false; myCol = 'blk'; setup(); start(); }
+    function setup() { conn.on('data', d => { if(d.t==='M') { b = d.b; turn = true; draw(); } }); }
+    
+    function start() {
+        document.getElementById('setup').style.display='none';
+        b = Array(8).fill().map(() => Array(8).fill(null));
         for(let r=0; r<8; r++) for(let c=0; c<8; c++) {
-            const s = document.createElement('div'); s.className = `sq ${(r+c)%2===0?'l':'d'}`;
-            if(sel && sel.r===r && sel.c===c) s.classList.add('sel');
-            if(game[r][c]) s.innerHTML = `<div class="piece p-${game[r][c][0]} ${game[r][c].includes('K')?'king':''}"></div>`;
-            s.onclick = () => {
-                if(!isMyTurn) return;
+            if((r+c)%2!==0) {
+                if(r<3) b[r][c] = {c:'blk', k:false};
+                if(r>4) b[r][c] = {c:'red', k:false};
+            }
+        }
+        draw();
+    }
+
+    function draw() {
+        bEl.innerHTML = ''; document.getElementById('st').innerText = turn ? "YOUR TURN" : "OPPONENT'S TURN";
+        for(let r=0; r<8; r++) for(let c=0; c<8; c++) {
+            const sq = document.createElement('div'); sq.className = `sq ${(r+c)%2===0?'lt':'dk'}`;
+            if(b[r][c]) {
+                const p = document.createElement('div'); p.className = `p ${b[r][c].c} ${b[r][c].k?'k':''} ${sel?.r===r&&sel?.c===c?'sel':''}`;
+                sq.appendChild(p);
+            }
+            sq.onclick = () => {
+                if(!turn) return;
+                const p = b[r][c];
                 if(sel) {
-                    const m = isValid(sel.r, sel.c, r, c);
-                    if(!game[r][c] && m) {
-                        let p = game[sel.r][sel.c]; if((myCol==='w'&&r===0)||(myCol==='b'&&r===7)) p=p[0]+'K';
-                        game[r][c] = p; game[sel.r][sel.c] = ''; if(m.j) game[m.mr][m.mc] = '';
-                        sel = null; isMyTurn = false; if(conn) conn.send({game}); render();
-                    } else sel = null; render();
-                } else if(game[r][c][0] === myCol) { sel = {r,c}; render(); }
+                    const dr = r - sel.r, dc = c - sel.c, adr = Math.abs(dr), adc = Math.abs(dc);
+                    if(!p && adr <= 2 && adc === adr && (r+c)%2!==0) {
+                        if(adr===1 && !b[sel.r][sel.c].k && ((myCol==='red'&&dr>0)||(myCol==='blk'&&dr<0))) return; // One-way non-king
+                        if(adr===2) {
+                            const mid = b[(r+sel.r)/2][(c+sel.c)/2];
+                            if(!mid || mid.c === myCol) return;
+                            b[(r+sel.r)/2][(c+sel.c)/2] = null;
+                        }
+                        b[r][c] = b[sel.r][sel.c]; b[sel.r][sel.c] = null;
+                        if((myCol==='red'&&r===0)||(myCol==='blk'&&r===7)) b[r][c].k = true;
+                        turn = false; sel = null; if(conn) conn.send({t:'M', b}); draw();
+                    } else { sel = null; draw(); }
+                } else if(p && p.c === myCol) { sel = {r,c}; draw(); }
             };
-            boardEl.appendChild(s);
+            bEl.appendChild(sq);
         }
     }
 </script>
