@@ -1,36 +1,34 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Arcade Ultimate - Simulation Stable</title>
+    <title>Pool Simulation v3.0 - Hardened</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: white; font-family: system-ui; margin:0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
         #ui { background: #1a3a2a; width: 100%; padding: 12px; border-bottom: 3px solid #eec27e; display: flex; justify-content: space-between; box-sizing: border-box; font-size: 14px; }
-        canvas { background: radial-gradient(circle, #2a8c3d, #0e4d1f); border: 8px solid #3d2616; border-radius: 8px; margin-top: 10px; touch-action: none; max-width: 98vw; height: auto; aspect-ratio: 2 / 1; }
-        #setup, #end-screen { position: fixed; inset: 0; background: rgba(10,15,20,0.98); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .btn { background: #eec27e; color: #3e2e14; padding: 14px 28px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        canvas { background: radial-gradient(circle, #2a8c3d, #0e4d1f); border: 10px solid #3d2616; border-radius: 12px; margin-top: 10px; touch-action: none; max-width: 98vw; height: auto; aspect-ratio: 2 / 1; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #setup, #end-screen { position: fixed; inset: 0; background: rgba(10,15,20,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { background: #eec27e; color: #3e2e14; padding: 14px 28px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         input { padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center; background: #111; color: white; border: 1px solid #eec27e; width: 220px; }
     </style>
 </head>
 <body>
     <div id="setup">
-        <h1 style="color: #eec27e; margin-bottom:5px;">ARCADE MASTER</h1>
-        <p style="color:#888; margin-bottom:20px;">Stable P2P Build v2.1</p>
+        <h1 style="color:#eec27e">ULTIMATE POOL</h1>
         <div id="my-id" style="font-size:2.5rem; margin:10px; font-weight:bold; color:white;">...</div>
-        <input type="number" id="join-id" placeholder="Enter Partner Code">
+        <input type="number" id="join-id" placeholder="Partner Code">
         <button class="btn" onclick="connect()">JOIN MATCH</button>
-        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer; text-decoration: underline;">Practice Solo</button>
+        <button onclick="start(true)" style="margin-top:20px; color:#eec27e; background:none; border:none; cursor:pointer;">Practice Mode</button>
     </div>
 
     <div id="end-screen" style="display:none;">
-        <h1 id="end-msg" style="font-size: 3rem; color: #eec27e;">YOU WIN!</h1>
-        <button class="btn" onclick="location.reload()">NEW GAME</button>
+        <h1 id="end-msg" style="font-size: 3rem; color: #eec27e;">WINNER!</h1>
+        <button class="btn" onclick="location.reload()">REMATCH</button>
     </div>
     
     <div id="ui">
         <div id="turn">WAITING...</div>
-        <div id="status">BALLS: 15</div>
         <div id="pwr" style="color:#eec27e">POWER: 0%</div>
     </div>
     <canvas id="table" width="800" height="400"></canvas>
@@ -39,7 +37,7 @@
     const canvas = document.getElementById('table'), ctx = canvas.getContext('2d');
     let balls = [], isMyTurn = false, conn = null, moving = false, gameActive = true;
     let mouse = {x:0, y:0, down:false}, ballsPocketedThisTurn = 0;
-    const pockets = [[0,0],[400,0],[800,0],[0,400],[400,400],[800,400]];
+    const pockets = [[0,0],[400,-10],[800,0],[0,400],[400,410],[800,400]];
 
     function getCoords(e) {
         const r = canvas.getBoundingClientRect();
@@ -89,7 +87,7 @@
         if(mouse.down && isMyTurn) {
             let dx = balls[0].x-mouse.x, dy = balls[0].y-mouse.y, dist = Math.hypot(dx, dy);
             if(dist > 15) {
-                let force = Math.min(dist/10, 20);
+                let force = Math.min(dist/10, 22);
                 balls[0].vx = (dx/dist)*force; balls[0].vy = (dy/dist)*force;
                 moving = true; mouse.down = false; ballsPocketedThisTurn = 0;
                 if(conn) conn.send({type:'SYNC', balls, moving: true, turnRequest: false});
@@ -114,18 +112,21 @@
     function endGame(win) { gameActive = false; document.getElementById('end-screen').style.display='flex'; document.getElementById('end-msg').innerText = win ? "YOU WIN!" : "YOU LOSE!"; }
 
     function animate() {
-        ctx.clearRect(0,0,800,400); ctx.fillStyle = '#111'; pockets.forEach(p => { ctx.beginPath(); ctx.arc(p[0],p[1],28,0,7); ctx.fill(); });
+        ctx.clearRect(0,0,800,400); ctx.fillStyle = '#0a0a0a'; pockets.forEach(p => { ctx.beginPath(); ctx.arc(p[0],p[1],28,0,7); ctx.fill(); });
         let stillMoving = false;
-        for(let s=0; s<4; s++) { 
+        for(let s=0; s<6; s++) { // Increased physics precision to 6x sub-sampling
             balls.forEach((b, i) => {
                 if(b.sunk) return;
-                b.x += b.vx/4; b.y += b.vy/4;
-                if(b.x<12 || b.x>788) b.vx *= -0.82; if(b.y<12 || b.y>388) b.vy *= -0.82;
+                b.x += b.vx/6; b.y += b.vy/6;
+                if(b.x<11 || b.x>789) b.vx *= -0.85; if(b.y<11 || b.y>389) b.vy *= -0.85;
                 pockets.forEach(p => {
                     if(Math.hypot(b.x-p[0], b.y-p[1]) < 26) {
                         b.sunk = true; b.vx = b.vy = 0;
                         if(b.type === 'cue') setTimeout(() => { b.x=200; b.y=200; b.vx=0; b.vy=0; b.sunk=false; }, 500);
-                        else if(b.color === '#000') { endGame(balls.filter(v=>!v.sunk && v.type!=='cue').length===0); if(conn) conn.send({type:'WIN'}); }
+                        else if(b.color === '#000') { 
+                            let win = balls.filter(v=>!v.sunk && v.type!=='cue' && v.color!=='#000').length === 0;
+                            endGame(win); if(conn) conn.send({type:'WIN'}); 
+                        }
                         else ballsPocketedThisTurn++;
                     }
                 });
@@ -135,9 +136,10 @@
         balls.forEach(b => {
             if(b.sunk) return;
             b.vx *= 0.988; b.vy *= 0.988;
-            if(Math.hypot(b.vx, b.vy) > 0.3) stillMoving = true; else { b.vx=0; b.vy=0; }
+            if(Math.hypot(b.vx, b.vy) > 0.28) stillMoving = true; else { b.vx=0; b.vy=0; }
             ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, 11, 0, 7); ctx.fill();
-            ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.stroke();
+            ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth=1; ctx.stroke();
+            if(b.type==='cue') { ctx.fillStyle="rgba(255,255,255,0.3)"; ctx.beginPath(); ctx.arc(b.x-3, b.y-3, 3, 0, 7); ctx.fill(); }
         });
 
         if (moving && !stillMoving) {
@@ -152,13 +154,12 @@
         if(isMyTurn && !moving && !balls[0].sunk && gameActive) {
             let dx = balls[0].x-mouse.x, dy = balls[0].y-mouse.y, ang = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
             ctx.save(); ctx.translate(balls[0].x, balls[0].y); ctx.rotate(ang);
-            ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.moveTo(15,0); ctx.lineTo(300,0); ctx.stroke();
-            ctx.setLineDash([]); ctx.fillStyle="#5d3a1a"; let pull = mouse.down ? Math.min(d/5, 45) : 0;
-            ctx.fillRect(-40-pull, -4, 250, 8); ctx.restore();
-            document.getElementById('pwr').innerText = "POWER: " + Math.round(Math.min(d/10, 20)*5) + "%";
+            ctx.setLineDash([5,5]); ctx.strokeStyle="rgba(255,255,255,0.4)"; ctx.beginPath(); ctx.moveTo(15,0); ctx.lineTo(300,0); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle="#5d3a1a"; let pull = mouse.down ? Math.min(d/5, 50) : 0;
+            ctx.fillRect(-45-pull, -4, 250, 8); ctx.fillStyle="#eec27e"; ctx.fillRect(-45-pull, -4, 10, 8); ctx.restore();
+            document.getElementById('pwr').innerText = "POWER: " + Math.round(Math.min(d/10, 22)*4.5) + "%";
         }
         document.getElementById('turn').innerText = isMyTurn ? "★ YOUR TURN ★" : "OPPONENT'S TURN";
-        document.getElementById('status').innerText = "BALLS: " + (balls.filter(b=>!b.sunk && b.color!=='#fff').length);
         if(gameActive) requestAnimationFrame(animate);
     }
 </script>

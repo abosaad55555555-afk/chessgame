@@ -3,23 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Arcade Hub</title>
+    <title>ULTRA ARCADE P2P</title>
     <style>
-        body { background: #0d1117; color: white; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-        h1 { color: #eec27e; font-size: clamp(2rem, 8vw, 3.5rem); margin-bottom: 40px; text-shadow: 0 0 20px rgba(238, 194, 126, 0.3); }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; width: 90%; max-width: 800px; }
-        .card { background: #161b22; border: 2px solid #30363d; padding: 30px; border-radius: 20px; text-decoration: none; color: white; font-weight: bold; transition: 0.3s; text-align: center; }
-        .card:hover { border-color: #eec27e; transform: translateY(-5px); background: #1c2128; }
-        .card span { display: block; font-size: 3rem; margin-bottom: 10px; }
+        :root {
+            --neon: #eec27e;
+            --bg: #0d1117;
+        }
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            letter-spacing: 4px;
+            color: var(--neon);
+            text-shadow: 0 0 10px rgba(238, 194, 126, 0.5);
+        }
+        p { color: #8b949e; margin-top: 10px; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 20px;
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+        }
+        
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .card:hover {
+            border-color: var(--neon);
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .card h2 {
+            font-size: 1.2rem;
+            margin: 10px 0 5px;
+        }
+        
+        .status {
+            font-size: 0.7rem;
+            color: #779556;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            color: #484f58;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
-    <h1>P2P ARCADE</h1>
+
+    <header>
+        <h1>ULTRA ARCADE</h1>
+        <p>Private Peer-to-Peer Gaming Suite</p>
+    </header>
+
     <div class="grid">
-        <a href="pool.html" class="card"><span>🎱</span> POOL</a>
-        <a href="chess.html" class="card"><span>♟</span> CHESS</a>
-        <a href="checkers.html" class="card"><span>🏁</span> CHECKERS</a>
-        <a href="tictactoe.html" class="card"><span>❌</span> TIC-TAC-TOE</a>
+        <a href="pool.html" class="card">
+            <div class="icon">🎱</div>
+            <h2>POOL</h2>
+            <div class="status">● Simulation Stable</div>
+        </a>
+
+        <a href="chess.html" class="card">
+            <div class="icon">♟️</div>
+            <h2>CHESS</h2>
+            <div class="status">● Anti-Desync v4.0</div>
+        </a>
+
+        <a href="checkers.html" class="card">
+            <div class="icon">🏁</div>
+            <h2>CHECKERS</h2>
+            <div class="status">● P2P Ready</div>
+        </a>
+
+        <a href="tictactoe.html" class="card">
+            <div class="icon">❌</div>
+            <h2>XO GAME</h2>
+            <div class="status">● Legacy Build</div>
+        </a>
     </div>
+
+    <footer>
+        &copy; 2026 Arcade P2P Engine | Secure Peer-to-Peer Encryption
+    </footer>
+
 </body>
 </html>
