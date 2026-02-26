@@ -2,129 +2,93 @@
 <html>
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grandmaster P2P - Hardened</title>
+    <title>Chess Stable Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #121212; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; }
-        #board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 450px; aspect-ratio: 1/1; border: 5px solid #333; }
-        .sq { display: flex; justify-content: center; align-items: center; font-size: 2.5rem; cursor: pointer; user-select: none; }
+        #board-wrapper { width: 95vw; max-width: 450px; aspect-ratio: 1/1; margin-top: 20px; }
+        #board { display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; height: 100%; border: 4px solid #333; }
+        .sq { display: flex; justify-content: center; align-items: center; font-size: 2.2rem; cursor: pointer; user-select: none; }
         .light { background: #ebecd0; } .dark { background: #779556; }
         .selected { background: #f6f669 !important; }
-        #ui { padding: 15px; text-align: center; }
-        .btn { background: #779556; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-weight: bold; }
-        #setup { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+        .highlight::after { content: ''; width: 15px; height: 15px; background: rgba(0,0,0,0.1); border-radius: 50%; }
+        #setup { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
     <div id="setup">
-        <h2>CHESS P2P</h2>
-        <div id="my-id" style="font-size: 2rem; margin: 10px; color: #779556;">...</div>
-        <input type="number" id="join-id" placeholder="Friend's ID" style="padding: 10px; margin-bottom: 10px;">
-        <button class="btn" onclick="connect()">JOIN MATCH</button>
-        <p style="font-size: 0.8rem; color: #888;">Simulation Build v4.0 (Anti-Desync)</p>
+        <h2>CHESS STABLE</h2>
+        <div id="my-id" style="font-size: 2rem; color: #779556; margin: 10px;">...</div>
+        <input type="number" id="join-id" style="padding:10px;" placeholder="Partner ID">
+        <button onclick="connect()" style="padding:10px 20px; margin-top:10px; background:#779556; color:white; border:none; border-radius:5px;">JOIN GAME</button>
     </div>
-
-    <div id="ui">
-        <h3 id="turn-display">WAITING FOR PARTNER...</h3>
+    <div id="ui" style="margin-top:20px;">
+        <h3 id="msg">WAITING...</h3>
     </div>
-    <div id="board"></div>
+    <div id="board-wrapper"><div id="board"></div></div>
 
 <script>
     const boardEl = document.getElementById('board');
     let board = [], selected = null, isMyTurn = false, myColor = 'w', conn = null;
 
-    // FEN-style board initialization
-    const initialBoard = [
-        ['r','n','b','q','k','b','n','r'],
-        ['p','p','p','p','p','p','p','p'],
-        Array(8).fill(null), Array(8).fill(null), Array(8).fill(null), Array(8).fill(null),
-        ['P','P','P','P','P','P','P','P'],
-        ['R','N','B','Q','K','B','N','R']
+    const initial = [
+        ['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],
+        [0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],
+        ['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']
     ];
 
-    const pieces = {
-        'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-        'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+    const icons = {
+        'r': '♜','n': '♞','b': '♝','q': '♛','k': '♚','p': '♟',
+        'R': '♖','N': '♘','B': '♗','Q': '♕','K': '♔','P': '♙'
     };
 
     const peer = new Peer(Math.floor(1000 + Math.random()*9000).toString());
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    
-    peer.on('connection', c => { 
-        conn = c; myColor = 'w'; isMyTurn = true; setupConn(); 
-        document.getElementById('setup').style.display = 'none';
-        initGame();
-    });
+    peer.on('connection', c => { conn = c; myColor = 'w'; isMyTurn = true; setupConn(); start(); });
 
     function connect() {
         const tid = document.getElementById('join-id').value;
-        conn = peer.connect(tid); myColor = 'b'; isMyTurn = false; setupConn();
-        document.getElementById('setup').style.display = 'none';
-        initGame();
+        conn = peer.connect(tid); myColor = 'b'; isMyTurn = false; setupConn(); start();
     }
 
     function setupConn() {
-        conn.on('data', d => {
-            if (d.type === 'MOVE') {
-                board = d.board;
-                isMyTurn = true;
-                render();
-            }
-        });
+        conn.on('data', d => { if(d.type==='MOVE') { board = d.board; isMyTurn = true; render(); } });
     }
 
-    function initGame() {
-        board = JSON.parse(JSON.stringify(initialBoard));
-        render();
-    }
+    function start() { document.getElementById('setup').style.display='none'; board = JSON.parse(JSON.stringify(initial)); render(); }
 
     function render() {
         boardEl.innerHTML = '';
-        document.getElementById('turn-display').innerText = isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN";
-        
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
+        document.getElementById('msg').innerText = isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN";
+        for(let r=0; r<8; r++) {
+            for(let c=0; c<8; c++) {
                 const sq = document.createElement('div');
-                sq.className = `sq ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
-                if (selected && selected.r === r && selected.c === c) sq.classList.add('selected');
-                sq.innerText = pieces[board[r][c]] || '';
-                sq.onclick = () => handleSquareClick(r, c);
+                sq.className = `sq ${(r+c)%2===0 ? 'light' : 'dark'}`;
+                if(selected && selected.r === r && selected.c === c) sq.classList.add('selected');
+                sq.innerText = icons[board[r][c]] || '';
+                sq.onclick = () => click(r,c);
                 boardEl.appendChild(sq);
             }
         }
     }
 
-    function handleSquareClick(r, c) {
-        if (!isMyTurn) return;
-
-        const piece = board[r][c];
-        
-        if (selected) {
-            // Basic "Is it my piece" check for the destination
-            if (piece && ((myColor === 'w' && piece === piece.toLowerCase()) || (myColor === 'b' && piece === piece.toUpperCase()))) {
-                // CAPTURE OR MOVE
-                executeMove(selected.r, selected.c, r, c);
-            } else if (!piece) {
-                // EMPTY SQUARE MOVE
-                executeMove(selected.r, selected.c, r, c);
-            } else {
-                selected = null; // Deselect if clicking own piece
-            }
+    function click(r, c) {
+        if(!isMyTurn) return;
+        const p = board[r][c];
+        if(selected) {
+            // Move piece
+            board[r][c] = board[selected.r][selected.c];
+            board[selected.r][selected.c] = 0;
+            isMyTurn = false;
             selected = null;
+            if(conn) conn.send({type:'MOVE', board});
+            render();
         } else {
-            if (piece && ((myColor === 'w' && piece === piece.toUpperCase()) || (myColor === 'b' && piece === piece.toLowerCase()))) {
-                selected = {r, c};
+            if(p && ((myColor==='w' && p===p.toUpperCase()) || (myColor==='b' && p===p.toLowerCase()))) {
+                selected = {r,c};
+                render();
             }
         }
-        render();
-    }
-
-    function executeMove(fr, fc, tr, tc) {
-        board[tr][tc] = board[fr][fc];
-        board[fr][fc] = null;
-        isMyTurn = false;
-        if (conn) conn.send({ type: 'MOVE', board: board });
-        render();
     }
 </script>
 </body>
