@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Pool - Final Release v2.1 (Aim Assist)</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@400;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        
+        body { 
+            background: #0a0e17; 
+            color: #fff; 
+            font-family: 'Roboto', sans-serif; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #ui { 
+            background: linear-gradient(180deg, #1a2332 0%, #0f1620 100%);
+            width: 100%; 
+            padding: 12px 20px; 
+            border-bottom: 2px solid #c9a84c;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        #turn { 
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        .turn-active { color: #4ade80; }
+        .turn-wait { color: #f87171; }
+        
+        #timer {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #c9a84c;
+            text-align: center;
+        }
+        
+        .timer-warning { color: #ef4444 !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        #assignment {
+            text-align: center;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .ball-badge {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        #pwr-container { text-align: right; font-family: 'Orbitron', sans-serif; }
+        #pwr-bar {
+            width: 120px;
+            height: 8px;
+            background: #1a2332;
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+            border: 1px solid #333;
+        }
+        #pwr-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4ade80, #fbbf24, #ef4444);
+            transition: width 0.05s;
+        }
+        
+        canvas { 
+            background: #0d5c3b; 
+            display: block; 
+            touch-action: none;
+            cursor: crosshair;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border-radius: 12px;
+            margin-top: 15px;
+        }
+        
+        #setup {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, #1a2332 0%, #0a0e17 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #c9a84c, #f0d78c, #c9a84c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .id-box {
+            background: rgba(201,168,76,0.1);
+            border: 2px solid #c9a84c;
+            border-radius: 12px;
+            padding: 20px 40px;
+            text-align: center;
+        }
+        
+        .id-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.8rem;
+            color: #c9a84c;
+            font-weight: 700;
+        }
+        
+        input {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #334155;
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            text-align: center;
+            width: 250px;
+            outline: none;
+        }
+        input:focus { border-color: #c9a84c; }
+        
+        .btn {
+            background: linear-gradient(135deg, #c9a84c, #a88a3a);
+            color: #0a0e17;
+            padding: 14px 36px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-secondary { background: transparent; color: #c9a84c; border: 2px solid #c9a84c; }
+        
+        #game-over {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .modal-content {
+            background: linear-gradient(180deg, #1a2332, #0f1620);
+            border: 2px solid #c9a84c;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+        }
+        
+        .win { color: #4ade80; }
+        .lose { color: #ef4444; }
+
+        #foul-msg {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+            display: none;
+            z-index: 40;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <div class="logo">PRO POOL</div>
+        <div class="id-box">
+            <div style="color: #64748b; font-size: 0.85rem; text-transform: uppercase;">Your Room Code</div>
+            <div class="id-value" id="my-id">...</div>
+        </div>
+        <input type="number" id="join-id" placeholder="Enter Room Code">
+        <button class="btn" onclick="connect()">Join Match</button>
+        <button class="btn btn-secondary" onclick="start(true)">Practice Mode</button>
+    </div>
+
+    <div id="foul-msg">FOUL!</div>
+
+    <div id="game-over">
+        <div class="modal-content">
+            <h2 id="go-title" style="font-family: 'Orbitron'; font-size: 2rem; margin-bottom: 10px;">Victory!</h2>
+            <p id="go-msg" style="color: #94a3b8; margin-bottom: 25px;"></p>
+            <button class="btn" onclick="location.reload()">Play Again</button>
+        </div>
+    </div>
+
+    <div id="ui">
+        <div id="turn" class="turn-wait">WAITING...</div>
+        <div id="assignment"></div>
+        <div id="timer">60</div>
+        <div id="pwr-container">
+            <span style="font-size: 0.8rem; color: #c9a84c;">POWER</span>
+            <div id="pwr-bar"><div id="pwr-fill"></div></div>
+        </div>
+    </div>
+    <canvas id="table" width="900" height="450"></canvas>
+
+<script>
+    // --- All your original Physics & Table Constants ---
+    const TABLE_W = 900, TABLE_H = 450;
+    const BALL_R = 11;
+    const POCKET_R = 38;
+    const FRICTION = 0.985;
+    const MAX_POWER = 20;
+    const SHOT_TIME = 60;
+    const FALL_DURATION = 400;
+    const CHARGE_RATE = 50;
+    
+    const WALL_L = 24, WALL_R = TABLE_W - 24;
+    const WALL_T = 24, WALL_B = TABLE_H - 24;
+
+    const pockets = [
+        { x: 2, y: 2, r: POCKET_R, capture: POCKET_R + BALL_R + 2 },
+        { x: TABLE_W/2, y: -2, r: POCKET_R - 2, capture: POCKET_R + BALL_R },
+        { x: TABLE_W - 2, y: 2, r: POCKET_R, capture: POCKET_R + BALL_R + 2 },
+        { x: 2, y: TABLE_H - 2, r: POCKET_R, capture: POCKET_R + BALL_R + 2 },
+        { x: TABLE_W/2, y: TABLE_H + 2, r: POCKET_R - 2, capture: POCKET_R + BALL_R },
+        { x: TABLE_W - 2, y: TABLE_H - 2, r: POCKET_R, capture: POCKET_R + BALL_R + 2 }
+    ];
+
+    const BALL_DEFS = [
+        { num: 1, type: 'solid', color: '#eab308' }, { num: 2, type: 'solid', color: '#3b82f6' },
+        { num: 3, type: 'solid', color: '#ef4444' }, { num: 4, type: 'solid', color: '#a855f7' },
+        { num: 5, type: 'solid', color: '#f97316' }, { num: 6, type: 'solid', color: '#22c55e' },
+        { num: 7, type: 'solid', color: '#7f1d1d' }, { num: 8, type: '8ball', color: '#000000' },
+        { num: 9, type: 'stripe', color: '#eab308' }, { num: 10, type: 'stripe', color: '#3b82f6' },
+        { num: 11, type: 'stripe', color: '#ef4444' }, { num: 12, type: 'stripe', color: '#a855f7' },
+        { num: 13, type: 'stripe', color: '#f97316' }, { num: 14, type: 'stripe', color: '#22c55e' },
+        { num: 15, type: 'stripe', color: '#7f1d1d' }
+    ];
+
+    const canvas = document.getElementById('table');
+    const ctx = canvas.getContext('2d');
+    
+    let balls = [];
+    let isMyTurn = false, isHost = false, conn = null;
+    let moving = false, gameActive = false, gameOver = false;
+    let aim = { active: false, angle: 0, power: 0, charging: false };
+    let predictionPoint = null; // New for assist
+    let ballsPocketedThisTurn = [];
+    let cueBallScratched = false;
+    let myType = null, opponentType = null;
+    let tableOpen = true, breakShot = true, ballInHand = false;
+    let firstContact = null;
+    let timerInterval = null, timeLeft = SHOT_TIME;
+    let animId = null;
+    let mouseX = TABLE_W/2, mouseY = TABLE_H/2;
+
+    const peerId = Math.floor(1000 + Math.random() * 9000).toString();
+    const peer = new Peer(peerId);
+    
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => {
+        if (conn) return;
+        conn = c; isHost = true; isMyTurn = true;
+        setupConn(); start();
+    });
+
+    function connect() {
+        const tid = document.getElementById('join-id').value;
+        if (!tid) return;
+        conn = peer.connect(tid); isHost = false; isMyTurn = false;
+        setupConn(); start();
+    }
+
+    function setupConn() {
+        conn.on('open', () => updateTurnUI());
+        conn.on('data', d => {
+            if (d.type === 'SYNC') {
+                balls = d.balls; moving = d.moving; tableOpen = d.tableOpen;
+                myType = d.yourType; opponentType = d.myType;
+                updateAssignmentUI();
+                if (d.turnRequest) { isMyTurn = true; resetTurnState(); }
+            }
+            if (d.type === 'WIN') showGameOver(true, d.msg);
+            if (d.type === 'LOSE') showGameOver(false, d.msg);
+            if (d.type === 'FOUL') showFoul(d.msg);
+        });
+        conn.on('close', () => { if (!gameOver) showGameOver(false, "Opponent disconnected"); });
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = SHOT_TIME;
+        updateTimerDisplay();
+        timerInterval = setInterval(() => {
+            if (!isMyTurn || moving || !gameActive) return;
+            timeLeft--;
+            updateTimerDisplay();
+            if (timeLeft <= 0) handleTimeOut();
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const el = document.getElementById('timer');
+        el.innerText = timeLeft;
+        el.className = timeLeft <= 10 ? 'timer-warning' : '';
+    }
+
+    function handleTimeOut() {
+        clearInterval(timerInterval);
+        isMyTurn = false;
+        if (conn) {
+            conn.send({ type: 'FOUL', msg: 'Shot clock expired!' });
+            conn.send({ type: 'SYNC', balls, moving: false, turnRequest: true, myType, yourType: opponentType, tableOpen });
+        }
+        updateTurnUI();
+        showFoul('Shot clock expired!');
+    }
+
+    function stopTimer() { clearInterval(timerInterval); document.getElementById('timer').innerText = '--'; }
+
+    function start(practice = false) {
+        document.getElementById('setup').style.display = 'none';
+        gameActive = true;
+        if (practice) { isMyTurn = true; isHost = true; myType = 'both'; }
+        initRack();
+        if (isMyTurn) startTimer();
+        animate();
+    }
+
+    function initRack() {
+        balls = [];
+        balls.push({ x: 225, y: TABLE_H/2, vx: 0, vy: 0, color: '#fff', type: 'cue', num: 0, sunk: false, falling: false, fallStart: 0, fallProgress: 0 });
+        const pattern = [[1], [9,2], [10,8,3], [11,7,14,4], [6,13,15,12,5]];
+        const rowH = BALL_R * 1.732, colW = BALL_R * 2;
+        for (let row = 0; row < pattern.length; row++) {
+            for (let col = 0; col < pattern[row].length; col++) {
+                const num = pattern[row][col];
+                const def = BALL_DEFS.find(b => b.num === num);
+                balls.push({ x: 620 + row * rowH, y: TABLE_H/2 + (col - row/2) * colW, vx: 0, vy: 0, color: def.color, type: def.type, num: def.num, sunk: false, falling: false, fallStart: 0, fallProgress: 0 });
+            }
+        }
+    }
+
+    function resetTurnState() {
+        ballsPocketedThisTurn = []; cueBallScratched = false; firstContact = null;
+        aim.active = false; aim.power = 0;
+        startTimer(); updateTurnUI();
+    }
+
+    function showFoul(msg) {
+        const el = document.getElementById('foul-msg');
+        el.innerText = msg; el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 3000);
+    }
+
+    function getCanvasCoords(clientX, clientY) {
+        const r = canvas.getBoundingClientRect();
+        return { x: (clientX - r.left) * (TABLE_W / r.width), y: (clientY - r.top) * (TABLE_H / r.height) };
+    }
+
+    document.addEventListener('mousemove', (e) => { const p = getCanvasCoords(e.clientX, e.clientY); mouseX = p.x; mouseY = p.y; });
+    document.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+            const p = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+            mouseX = p.x; mouseY = p.y;
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', startAim);
+    canvas.addEventListener('touchstart', startAim, { passive: false });
+    document.addEventListener('mouseup', releaseShot);
+    document.addEventListener('touchend', releaseShot);
+
+    function startAim(e) {
+        if (!gameActive || !isMyTurn || moving) return;
+        e.preventDefault();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const p = getCanvasCoords(clientX, clientY);
+        
+        if (ballInHand) {
+            balls[0].x = Math.max(BALL_R + 5, Math.min(TABLE_W - BALL_R - 5, p.x));
+            balls[0].y = Math.max(BALL_R + 5, Math.min(TABLE_H - BALL_R - 5, p.y));
+            balls[0].sunk = false; ballInHand = false; return;
+        }
+        
+        if (balls[0].sunk) return;
+        aim.active = true; aim.charging = true; aim.power = 0;
+        aim.angle = Math.atan2(balls[0].y - p.y, balls[0].x - p.x);
+    }
+
+    function updateAim() {
+        if (!aim.active || !aim.charging) return;
+        const cue = balls[0];
+        const dx = cue.x - mouseX, dy = cue.y - mouseY;
+        if (Math.hypot(dx, dy) > 5) aim.angle = Math.atan2(dy, dx);
+        if (aim.power < MAX_POWER) { 
+            aim.power += CHARGE_RATE / 60; 
+            if (aim.power > MAX_POWER) aim.power = MAX_POWER; 
+        }
+        document.getElementById('pwr-fill').style.width = (aim.power / MAX_POWER) * 100 + '%';
+
+        // --- NEW: AIM ASSIST PREDICTION ---
+        let closestT = Infinity;
+        const adx = Math.cos(aim.angle), ady = Math.sin(aim.angle);
+        for (let i = 1; i < balls.length; i++) {
+            const b = balls[i]; if (b.sunk || b.falling) continue;
+            const bx = b.x - cue.x, by = b.y - cue.y;
+            const b_val = -(adx * bx + ady * by);
+            const c = bx * bx + by * by - (BALL_R * 2) ** 2;
+            const disc = b_val * b_val - c;
+            if (disc >= 0) { 
+                const t = -b_val - Math.sqrt(disc); 
+                if (t > 0 && t < closestT) closestT = t; 
+            }
+        }
+        predictionPoint = closestT < Infinity ? { x: cue.x + adx * closestT, y: cue.y + ady * closestT } : null;
+    }
+
+    function releaseShot() {
+        if (!aim.active) return;
+        const wasCharging = aim.charging;
+        aim.charging = false; aim.active = false;
+        if (!gameActive || !isMyTurn || balls[0].sunk) return;
+        
+        if (aim.power > 1.5) { // Safety threshold
+            balls[0].vx = Math.cos(aim.angle) * aim.power;
+            balls[0].vy = Math.sin(aim.angle) * aim.power;
+            moving = true; ballsPocketedThisTurn = []; cueBallScratched = false;
+            firstContact = null; aim.power = 0;
+            document.getElementById('pwr-fill').style.width = '0%';
+            if (conn) conn.send({ type: 'SYNC', balls, moving: true, turnRequest: false, myType, yourType: opponentType, tableOpen });
+        } else {
+            aim.power = 0; document.getElementById('pwr-fill').style.width = '0%';
+        }
+    }
+
+    function resolveCollision(b1, b2) {
+        const dx = b2.x - b1.x, dy = b2.y - b1.y;
+        const distSq = dx*dx + dy*dy, minDist = BALL_R * 2;
+        if (distSq >= minDist * minDist || distSq < 0.01) return;
+        const dist = Math.sqrt(distSq), overlap = (minDist - dist) * 0.5, nx = dx / dist, ny = dy / dist;
+        b1.x -= nx * overlap; b1.y -= ny * overlap; b2.x += nx * overlap; b2.y += ny * overlap;
+        const velAlongNormal = (b2.vx - b1.vx) * nx + (b2.vy - b1.vy) * ny;
+        if (velAlongNormal > 0) return;
+        const impulse = -1.92 * velAlongNormal / 2;
+        b1.vx -= impulse * nx; b1.vy -= impulse * ny; b2.vx += impulse * nx; b2.vy += impulse * ny;
+        if (b1.type === 'cue' && !firstContact && b2.type !== 'cue') firstContact = b2.type;
+        else if (b2.type === 'cue' && !firstContact && b1.type !== 'cue') firstContact = b1.type;
+    }
+
+    function updatePhysics() {
+        let stillMoving = false; const steps = 6;
+        for (let step = 0; step < steps; step++) {
+            const now = performance.now();
+            balls.forEach(b => { 
+                if (b.falling) { 
+                    b.fallProgress = Math.min((now - b.fallStart) / FALL_DURATION, 1); 
+                    if (b.fallProgress >= 1) { b.falling = false; b.sunk = true; } 
+                } 
+            });
+            balls.forEach(b => {
+                if (b.sunk || b.falling) return;
+                b.x += b.vx / steps; b.y += b.vy / steps;
+                for (const p of pockets) { 
+                    if (Math.hypot(b.x - p.x, b.y - p.y) < p.capture) { 
+                        b.falling = true; b.fallStart = now; b.fallProgress = 0; b.vx = b.vy = 0; 
+                        if (b.type === 'cue') cueBallScratched = true; else ballsPocketedThisTurn.push(b.type); break; 
+                    } 
+                }
+                if (b.falling) return;
+                if (b.x < WALL_L + BALL_R) { b.x = WALL_L + BALL_R; b.vx = Math.abs(b.vx) * 0.75; }
+                if (b.x > WALL_R - BALL_R) { b.x = WALL_R - BALL_R; b.vx = -Math.abs(b.vx) * 0.75; }
+                if (b.y < WALL_T + BALL_R) { b.y = WALL_T + BALL_R; b.vy = Math.abs(b.vy) * 0.75; }
+                if (b.y > WALL_B - BALL_R) { b.y = WALL_B - BALL_R; b.vy = -Math.abs(b.vy) * 0.75; }
+            });
+            for (let i = 0; i < balls.length; i++) { 
+                for (let j = i + 1; j < balls.length; j++) { 
+                    if (!balls[i].sunk && !balls[j].sunk && !balls[i].falling && !balls[j].falling) resolveCollision(balls[i], balls[j]); 
+                } 
+            }
+        }
+        balls.forEach(b => { if (b.sunk) return; b.vx *= FRICTION; b.vy *= FRICTION; if (b.vx*b.vx + b.vy*b.vy > 0.0025 || b.falling) stillMoving = true; else { b.vx = 0; b.vy = 0; } });
+        return stillMoving;
+    }
+
+    function checkRules() {
+        const eightBall = balls.find(b => b.type === '8ball');
+        const myRemaining = balls.filter(b => b.type === myType && !b.sunk && !b.falling).length;
+        if (eightBall.sunk) {
+            if (cueBallScratched) return { gameOver: true, won: false, msg: "Scratched on the 8-ball!" };
+            if (myType === 'both' || myRemaining === 0) return { gameOver: true, won: true, msg: "8-ball sunk!" };
+            return { gameOver: true, won: false, msg: "8-ball sunk too early!" };
+        }
+        if (!breakShot && firstContact && !tableOpen && myType !== 'both' && firstContact !== myType && firstContact !== '8ball') return { foul: true, msg: "Foul! Hit your group first!" };
+        if (cueBallScratched) return { scratch: true };
+        let continueTurn = false;
+        if (ballsPocketedThisTurn.length > 0) {
+            if (tableOpen) { 
+                const valid = ballsPocketedThisTurn.find(t => t !== '8ball'); 
+                if (valid) { tableOpen = false; myType = valid; opponentType = valid === 'solid' ? 'stripe' : 'solid'; continueTurn = true; } 
+            }
+            else if (myType === 'both') continueTurn = true;
+            else { if (!ballsPocketedThisTurn.includes(opponentType) && ballsPocketedThisTurn.includes(myType)) continueTurn = true; }
+        }
+        return { turnContinue: continueTurn };
+    }
+
+    function animate() {
+        if (!gameActive) return;
+        updateAim(); drawTable(); const stillMoving = updatePhysics();
+        balls.slice().sort((a,b) => a.y - b.y).forEach(drawBall);
+        drawCue();
+        if (moving && !stillMoving) {
+            moving = false;
+            if (isMyTurn) {
+                const r = checkRules();
+                if (r.gameOver) { if (conn) conn.send({ type: r.won ? 'WIN' : 'LOSE', msg: r.msg }); showGameOver(r.won, r.msg); return; }
+                if (r.foul) { showFoul(r.msg); isMyTurn = false; }
+                else if (r.scratch) { balls[0].sunk = false; balls[0].x = 225; balls[0].y = TABLE_H/2; ballInHand = true; isMyTurn = false; }
+                else if (!r.turnContinue) isMyTurn = false;
+                breakShot = false;
+                if (conn) conn.send({ type: 'SYNC', balls, moving: false, turnRequest: !isMyTurn, myType, yourType: opponentType, tableOpen });
+                if (!isMyTurn) stopTimer(); else startTimer();
+                updateTurnUI(); updateAssignmentUI();
+            }
+        }
+        animId = requestAnimationFrame(animate);
+    }
+
+    // --- All your original Drawing Logic ---
+    function drawTable() {
+        ctx.clearRect(0,0,TABLE_W,TABLE_H); ctx.fillStyle = '#5c3a1e'; ctx.fillRect(0,0,TABLE_W,TABLE_H);
+        ctx.fillStyle = '#0d5c3b'; ctx.fillRect(WALL_L, WALL_T, WALL_R-WALL_L, WALL_B-WALL_T);
+        pockets.forEach(p => { ctx.fillStyle = '#0a0a0a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill(); });
+    }
+
+    function drawBall(b) {
+        if (b.sunk && !b.falling) return;
+        ctx.save(); ctx.translate(b.x, b.y + (b.falling ? b.fallProgress * 20 : 0));
+        if (b.falling) ctx.scale(1-b.fallProgress*0.6, 1-b.fallProgress*0.6);
+        ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(0,0,BALL_R,0,Math.PI*2); ctx.fill();
+        if (b.type === 'stripe') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0,0,BALL_R*0.65,0,Math.PI*2); ctx.fill(); ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(0,0,BALL_R*0.45,0,Math.PI*2); ctx.fill(); }
+        if (b.num > 0) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0,0,BALL_R*0.35,0,Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.font = `bold 5px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.num, 0, 0); }
+        ctx.restore();
+    }
+
+    function drawCue() {
+        if (!isMyTurn || moving || balls[0].sunk || gameOver) return;
+        const cue = balls[0];
+        
+        // --- AIM ASSIST RENDER ---
+        if (predictionPoint) {
+            ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([5,5]);
+            ctx.moveTo(cue.x, cue.y); ctx.lineTo(predictionPoint.x, predictionPoint.y); ctx.stroke();
+            ctx.beginPath(); ctx.arc(predictionPoint.x, predictionPoint.y, BALL_R, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill(); ctx.setLineDash([]);
+        }
+        
+        let angle = aim.active ? aim.angle : Math.atan2(cue.y - mouseY, cue.x - mouseX);
+        ctx.save(); ctx.translate(cue.x, cue.y); ctx.rotate(angle);
+        const stickLength = 240, tipX = -35 - (aim.active ? (aim.power / MAX_POWER) * 70 : 0);
+        ctx.fillStyle = '#8b6914'; ctx.fillRect(tipX, -4, stickLength, 8);
+        ctx.restore();
+    }
+
+    function updateTurnUI() { const el = document.getElementById('turn'); el.innerText = isMyTurn ? '★ YOUR TURN ★' : 'OPPONENT\'S TURN'; el.className = isMyTurn ? 'turn-active' : 'turn-wait'; }
+    
+    function updateAssignmentUI() {
+        const el = document.getElementById('assignment');
+        if (!myType || myType === 'both') { el.innerHTML = tableOpen ? '<span style="color:#64748b">OPEN TABLE</span>' : ''; return; }
+        const myC = myType === 'solid' ? '#eab308' : '#3b82f6', opC = opponentType === 'solid' ? '#eab308' : '#3b82f6';
+        el.innerHTML = `<span class="ball-badge" style="background:${myC}"></span> <span style="color:${myC}">${myType.toUpperCase()}</span> VS <span style="color:${opC}">${opponentType.toUpperCase()}</span> <span class="ball-badge" style="background:${opC}"></span>`;
+    }
+
+    function showGameOver(won, msg) { 
+        gameOver = true; gameActive = false; stopTimer(); 
+        document.getElementById('game-over').style.display = 'flex'; 
+        document.getElementById('go-title').innerText = won ? 'VICTORY!' : 'DEFEAT'; 
+        document.getElementById('go-msg').innerText = msg; 
+    }
+</script>
+</body>
+</html>
